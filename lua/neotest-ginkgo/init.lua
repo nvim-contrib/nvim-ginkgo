@@ -129,6 +129,7 @@ function adapter.build_spec(args)
 		context = {
 			file = position.path,
 			results_path = report_path,
+			results_type = position.type,
 		},
 	}
 end
@@ -178,8 +179,12 @@ function adapter.results(spec, result, tree)
 			spec_item_node.short = spec_item_node.short .. " " .. utils.create_spec_description(spec_item)
 			-- set the node location
 			spec_item_node.location = spec_item.LeafNodeLocation.LineNumber
-			-- set the node output
-			spec_item_node.output = async.fn.tempname()
+
+			---@diagnostic disable-next-line: undefined-field
+			if spec.context.results_type ~= "dir" then
+				-- set the node output
+				spec_item_node.output = async.fn.tempname()
+			end
 
 			if spec_item.State == "pending" then
 				spec_item_node.status = "skipped"
@@ -196,15 +201,19 @@ function adapter.results(spec, result, tree)
 				local err = utils.create_error(spec_item)
 				-- add the error
 				table.insert(spec_item_node.errors, err)
-				-- write the output
-				local err_output = utils.create_error_output(spec_item)
-				lib.files.write(spec_item_node.output, err_output)
+				if spec_item_node.output ~= nil then
+					-- write the output
+					local err_output = utils.create_error_output(spec_item)
+					lib.files.write(spec_item_node.output, err_output)
+				end
 				-- set the node short attribute
 				spec_item_node.short = spec_item_node.short .. ": " .. err.message
 			else
-				-- write the output
-				local spec_output = utils.create_spec_output(spec_item)
-				lib.files.write(spec_item_node.output, spec_output)
+				if spec_item_node.output ~= nil then
+					-- write the output
+					local spec_output = utils.create_spec_output(spec_item)
+					lib.files.write(spec_item_node.output, spec_output)
+				end
 			end
 
 			local spec_item_node_id = utils.create_location_id(spec_item)
