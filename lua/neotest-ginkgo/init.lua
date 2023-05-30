@@ -79,7 +79,7 @@ function adapter.build_spec(args)
 	table.insert(cargs, "-v")
 	-- TODO: we should pass the tags in any case
 	-- table.insert(cargs, utils.get_build_tags())
-
+	table.insert(cargs, "--cover")
 	---@diagnostic disable-next-line: undefined-field
 	local position = args.tree:data()
 	---@diagnostic disable-next-line: undefined-global
