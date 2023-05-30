@@ -57,7 +57,12 @@ function utils.create_spec_output(spec)
 
 	local output = {}
 	-- prepare the output
-	table.insert(output, main .. info.spec_status .. " " .. style.clear .. info_text)
+	table.insert(output, main .. info.spec_status .. " " .. style.clear .. info_text .. "\n")
+
+	if spec.CapturedGinkgoWriterOutput ~= nil then
+		table.insert(output, style.clear .. spec.CapturedGinkgoWriterOutput .. "\n")
+	end
+
 	-- done
 	return table.concat(output, "\n")
 end
@@ -100,12 +105,16 @@ function utils.create_error_output(spec)
 	table.insert(output, main .. info.failure_status .. " " .. style.clear .. info_text)
 	table.insert(output, style.gray .. info.failure_location .. "\n")
 	table.insert(output, main .. info.failure_status .. " " .. info.failure_message)
-	table.insert(output, style.bold .. "In " .. info.failure_node_type .. " at " .. info.failure_node_location)
+	table.insert(output, style.bold .. "In " .. info.failure_node_type .. " at " .. info.failure_node_location .. "\n")
+
+	if spec.CapturedGinkgoWriterOutput ~= nil then
+		table.insert(output, style.clear .. spec.CapturedGinkgoWriterOutput)
+	end
 
 	if spec.State == "panicked" then
-		table.insert(output, style.clear .. main .. "\n" .. failure.ForwardedPanic .. "\n")
+		table.insert(output, style.clear .. main .. failure.ForwardedPanic .. "\n")
 		table.insert(output, style.clear .. main .. "Full Stack Trace")
-		table.insert(output, style.clear .. info.failure_stack_trace)
+		table.insert(output, style.clear .. info.failure_stack_trace .. "\n")
 	end
 	-- done
 	return table.concat(output, "\n")
