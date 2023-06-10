@@ -2,11 +2,11 @@ local lib = require("neotest.lib")
 local plenary = require("plenary.path")
 local async = require("neotest.async")
 local logger = require("neotest.logging")
-local utils = require("neotest-ginkgo.utils")
+local utils = require("nvim-ginkgo.utils")
 
 ---@class neotest.Adapter
 ---@field name string
-local adapter = { name = "neotest-ginkgo" }
+local adapter = { name = "nvim-ginkgo" }
 
 ---Find the project root directory given a current directory to work from.
 ---Should no root be found, the adapter can still be used in a non-project context if a test file matches.

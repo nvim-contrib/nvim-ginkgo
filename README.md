@@ -1,4 +1,4 @@
-# neotest-ginkgo
+# nvim-ginkgo
 
 This plugin provides a [ginkgo](https://github.com/onsi/ginkgo) adapter for the [Neotest](https://github.com/nvim-neotest/neotest) framework.
 
@@ -13,13 +13,13 @@ Install with the package manager of your choice:
   "nvim-neotest/neotest",
   lazy = true,
   dependencies = {
-    "nvim-extensions/neotest-ginkgo",
+    "nvim-extensions/nvim-ginkgo",
   },
   config = function()
     require("neotest").setup({
       ...,
       adapters = {
-        require("neotest-ginkgo")
+        require("nvim-ginkgo")
       },
     }
   end

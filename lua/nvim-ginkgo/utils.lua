@@ -1,4 +1,4 @@
-local style = require("neotest-ginkgo.style")
+local style = require("nvim-ginkgo.style")
 
 local utils = {}
 
