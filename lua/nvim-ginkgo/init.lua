@@ -16,13 +16,11 @@ adapter.root = lib.files.match_root_pattern("go.mod", "go.sum")
 
 ---Filter directories when searching for test files
 ---@async
----@diagnostic disable-next-line: undefined-doc-param
 ---@param name string Name of directory
 ---@param rel_path string Path to directory, relative to root
----@diagnostic disable-next-line: undefined-doc-param
 ---@param root string Root directory of project
 ---@return boolean
-function adapter.filter_dir(_, rel_path, _)
+function adapter.filter_dir(name, rel_path, root)
 	return rel_path ~= "vendor"
 end
 
@@ -36,15 +34,12 @@ function adapter.is_test_file(file_path)
 
 	local file_path_segments = vim.split(file_path, plenary.path.sep)
 	local file_path_basename = file_path_segments[#file_path_segments]
-	local file_path_is_test = vim.endswith(file_path_basename, "_test.go")
-	-- done
-	return file_path_is_test
+	return vim.endswith(file_path_basename, "_test.go")
 end
 
 ---Given a file path, parse all the tests within it.
 ---@async
 ---@param file_path string Absolute file path
----@diagnostic disable-next-line: undefined-doc-name
 ---@return neotest.Tree | nil
 function adapter.discover_positions(file_path)
 	local query = [[
@@ -66,32 +61,25 @@ function adapter.discover_positions(file_path)
 	return lib.treesitter.parse_positions(file_path, query, { nested_namespaces = true, require_namespaces = true })
 end
 
----@diagnostic disable-next-line: undefined-doc-name
 ---@param args neotest.RunArgs
----@diagnostic disable-next-line: undefined-doc-name
 ---@return nil | neotest.RunSpec | neotest.RunSpec[]
 function adapter.build_spec(args)
-	local report_filename = "suite_test.json"
+	local report_path = async.fn.tempname()
+	local report_filename = vim.fn.fnamemodify(report_path, ":t")
+	local report_directory = vim.fn.fnamemodify(report_path, ":h")
 	local cargs = {}
 
 	table.insert(cargs, "ginkgo")
 	table.insert(cargs, "run")
 	table.insert(cargs, "-v")
-	-- TODO: we should pass the tags in any case
-	-- table.insert(cargs, utils.get_build_tags())
-	table.insert(cargs, "--cover")
-	---@diagnostic disable-next-line: undefined-field
-	local position = args.tree:data()
-	---@diagnostic disable-next-line: undefined-global
-	if vim.fn.isdirectory(position.path) ~= 1 then
-		table.insert(cargs, "--keep-separate-reports")
-	end
-
 	table.insert(cargs, "--keep-going")
+	table.insert(cargs, "--output-dir")
+	table.insert(cargs, report_directory)
 	table.insert(cargs, "--json-report")
 	table.insert(cargs, report_filename)
 
 	-- prepare the focus
+	local position = args.tree:data()
 	if position.type == "test" or position.type == "namespace" then
 		-- pos.id in form "path/to/file::Describe text::test text"
 		local name = string.sub(position.id, string.find(position.id, "::") + 2)
@@ -105,7 +93,6 @@ function adapter.build_spec(args)
 		table.insert(cargs, pattern)
 	end
 
-	---@diagnostic disable-next-line: undefined-global
 	local directory = position.path
 	-- The path for the position is not a directory, ensure the directory variable refers to one
 	if vim.fn.isdirectory(position.path) ~= 1 then
@@ -115,17 +102,13 @@ function adapter.build_spec(args)
 		directory = vim.fn.fnamemodify(position.path, ":h")
 	end
 
-	---@diagnostic disable-next-line: undefined-field
 	local extra_args = args.extra_args or {}
 	-- merge the argument
 	for _, value in ipairs(extra_args) do
 		table.insert(cargs, value)
 	end
 
-	---@diagnostic disable-next-line: undefined-global
 	table.insert(cargs, directory .. plenary.path.sep .. "...")
-	-- report the results path
-	local report_path = directory .. plenary.path.sep .. report_filename
 
 	return {
 		command = table.concat(cargs, " "),
@@ -140,18 +123,12 @@ function adapter.build_spec(args)
 end
 
 ---@async
----@diagnostic disable-next-line: undefined-doc-name
 ---@param spec neotest.RunSpec
----@diagnostic disable-next-line: undefined-doc-name
 ---@param result neotest.StrategyResult
----@diagnostic disable-next-line: undefined-doc-name
 ---@param tree neotest.Tree
----@diagnostic disable-next-line: undefined-doc-name
 ---@return table<string, neotest.Result>
----@diagnostic disable-next-line: unused-local
 function adapter.results(spec, result, tree)
 	local collection = {}
-	---@diagnostic disable-next-line: undefined-field
 	local report_path = spec.context.report_output_path
 
 	local fok, report_data = pcall(lib.files.read, report_path)
@@ -166,7 +143,6 @@ function adapter.results(spec, result, tree)
 		return {}
 	end
 
-	---@diagnostic disable-next-line: param-type-mismatch
 	for _, suite_item in pairs(report) do
 		if suite_item.SpecReports == nil then
 			local suite_item_node = {}
@@ -188,7 +164,6 @@ function adapter.results(spec, result, tree)
 				-- set the node location
 				spec_item_node.location = spec_item.LeafNodeLocation.LineNumber
 
-				---@diagnostic disable-next-line: undefined-field
 				-- set the node output
 				spec_item_node.output = async.fn.tempname()
 
