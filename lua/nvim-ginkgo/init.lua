@@ -46,14 +46,14 @@ function adapter.discover_positions(file_path)
     ; -- Namespaces --
     ; Matches: `describe('subject')` and `context('case')`
     ((call_expression
-      function: (identifier) @func_name (#any-of? @func_name "Describe" "DescribeTable" "Context" "When")
+      function: (identifier) @func_name (#any-of? @func_name "Describe" "FDescribe" "PDescribe" "XDescribe" "DescribeTable" "FDescribeTable" "PDescribeTable" "XDescribeTable" "Context" "FContext" "PContext" "XContext" "When" "FWhen" "PWhen" "XWhen")
       arguments: (argument_list ((interpreted_string_literal) @namespace.name))
     )) @namespace.definition
 
     ; -- Tests --
     ; Matches: `it('test')`
     ((call_expression
-      function: (identifier) @func_name (#any-of? @func_name "It" "Entry")
+      function: (identifier) @func_name (#any-of? @func_name "It" "FIt" "PIt" "XIt" "Specify" "FSpecify" "PSpecify" "XSpecify" "Entry" "FEntry" "PEntry" "XEntry")
       arguments: (argument_list ((interpreted_string_literal) @test.name))
     )) @test.definition
   ]]
@@ -158,19 +158,22 @@ function adapter.results(spec, result, tree)
 		for _, spec_item in pairs(suite_item.SpecReports or {}) do
 			if spec_item.LeafNodeType == "It" then
 				local spec_item_node = {}
-				-- set the node short attribute
-				spec_item_node.short = "[" .. string.upper(spec_item.State) .. "]"
-				spec_item_node.short = spec_item_node.short .. " " .. utils.create_spec_description(spec_item)
-				-- set the node location
-				spec_item_node.location = spec_item.LeafNodeLocation.LineNumber
 
 				if spec_item.State == "pending" then
 					spec_item_node.status = "skipped"
 				elseif spec_item.State == "panicked" then
 					spec_item_node.status = "failed"
+				elseif spec_item.State == "skipped" then
+					goto continue
 				else
 					spec_item_node.status = spec_item.State
 				end
+
+				-- set the node short attribute
+				spec_item_node.short = "[" .. string.upper(spec_item.State) .. "]"
+				spec_item_node.short = spec_item_node.short .. " " .. utils.create_spec_description(spec_item)
+				-- set the node location
+				spec_item_node.location = spec_item.LeafNodeLocation.LineNumber
 
 				-- set the node errors
 				if spec_item.Failure ~= nil then
@@ -200,6 +203,8 @@ function adapter.results(spec, result, tree)
 				-- set the node
 				collection[spec_item_node_id] = spec_item_node
 			end
+
+			::continue::
 		end
 	end
 
