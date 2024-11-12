@@ -52,16 +52,14 @@ function utils.create_spec_output(spec)
 	local info_text = utils.create_spec_description(spec, main)
 	-- prepare the info
 	local info = {
-		spec_status = "[" .. string.upper(spec.State) .. "]",
+		spec_location = utils.create_location_path(spec.LeafNodeLocation),
 	}
 
 	local output = {}
 	-- prepare the output
-	table.insert(output, main .. info.spec_status .. " " .. style.clear .. info_text .. "\n")
-
-	if spec.CapturedGinkgoWriterOutput ~= nil then
-		table.insert(output, style.clear .. spec.CapturedGinkgoWriterOutput .. "\n")
-	end
+	table.insert(output, main .. style.clear .. info_text)
+	table.insert(output, style.gray .. info.spec_location)
+	table.insert(output, style.clear .. utils.get_output(spec))
 
 	-- done
 	return table.concat(output, "\n")
@@ -73,7 +71,21 @@ function utils.create_spec_description(spec, color)
 		color = ""
 	end
 
-	local spec_desc = table.concat(spec.ContainerHierarchyTexts, " ")
+	local spec_desc_texts = {}
+	-- prepare
+	for index, line in ipairs(spec.ContainerHierarchyTexts) do
+		local line_color = ""
+
+		if index % 2 == 0 then
+			line_color = style.gray
+		else
+			line_color = style.clear
+		end
+
+		table.insert(spec_desc_texts, line_color .. line)
+	end
+
+	local spec_desc = table.concat(spec_desc_texts, " ")
 	local spec_name = "[" .. spec.LeafNodeType .. "] " .. spec.LeafNodeText
 	-- done
 	return spec_desc .. " " .. color .. spec_name
@@ -95,26 +107,26 @@ function utils.create_error_output(spec)
 		failure_status = "[" .. string.upper(spec.State) .. "]",
 		failure_node_type = "[" .. failure.FailureNodeType .. "]",
 		failure_node_location = utils.create_location_path(failure.FailureNodeLocation),
-		failure_message = failure.Message,
+		failure_message = utils.get_error(failure),
 		failure_location = utils.create_location_path(failure.Location),
 		failure_stack_trace = failure.Location.FullStackTrace,
 	}
 
 	local output = {}
 	-- prepare the output
-	table.insert(output, main .. info.failure_status .. " " .. style.clear .. info_text)
-	table.insert(output, style.gray .. info.failure_location .. "\n")
-	table.insert(output, main .. info.failure_status .. " " .. info.failure_message)
-	table.insert(output, style.bold .. "In " .. info.failure_node_type .. " at " .. info.failure_node_location .. "\n")
+	table.insert(output, main .. style.clear .. info_text)
+	table.insert(output, style.gray .. info.failure_location)
+	table.insert(output, main .. "\n  " .. info.failure_status .. " " .. info.failure_message)
+	table.insert(output, style.bold .. "  " .. "In " .. info.failure_node_type .. " at " .. info.failure_node_location)
 
 	if spec.CapturedGinkgoWriterOutput ~= nil then
-		table.insert(output, style.clear .. spec.CapturedGinkgoWriterOutput)
+		table.insert(output, style.clear .. utils.get_output(spec))
 	end
 
 	if spec.State == "panicked" then
-		table.insert(output, style.clear .. main .. failure.ForwardedPanic .. "\n")
+		table.insert(output, style.clear .. main .. failure.ForwardedPanic)
 		table.insert(output, style.clear .. main .. "Full Stack Trace")
-		table.insert(output, style.clear .. info.failure_stack_trace .. "\n")
+		table.insert(output, style.clear .. info.failure_stack_trace)
 	end
 	-- done
 	return table.concat(output, "\n")
@@ -147,6 +159,28 @@ function utils.get_build_tags()
 		return ""
 	end
 	return string.format("--tags=%s", table.concat(tags, ","))
+end
+
+---@return string
+function utils.get_output(item)
+	local output = {}
+	-- tab
+	for line in string.gmatch(item.CapturedGinkgoWriterOutput, "([^\n]+)") do
+		table.insert(output, "  " .. line)
+	end
+	-- done
+	return table.concat(output, "\n")
+end
+
+---@return string
+function utils.get_error(item)
+	local output = {}
+	-- tab
+	for line in string.gmatch(item.Message, "([^\n]+)") do
+		table.insert(output, "  " .. line)
+	end
+	-- done
+	return table.concat(output, "\n")
 end
 
 return utils

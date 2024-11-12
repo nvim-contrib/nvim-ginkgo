@@ -28,7 +28,7 @@ end
 ---@param file_path string
 ---@return boolean
 function adapter.is_test_file(file_path)
-	if not vim.endswith(file_path, ".go") then
+	if not vim.endswith(file_path, ".go") or vim.endswith(file_path, "suite_test.go") then
 		return false
 	end
 
@@ -164,9 +164,6 @@ function adapter.results(spec, result, tree)
 				-- set the node location
 				spec_item_node.location = spec_item.LeafNodeLocation.LineNumber
 
-				-- set the node output
-				spec_item_node.output = async.fn.tempname()
-
 				if spec_item.State == "pending" then
 					spec_item_node.status = "skipped"
 				elseif spec_item.State == "panicked" then
@@ -182,20 +179,25 @@ function adapter.results(spec, result, tree)
 					local err = utils.create_error(spec_item)
 					-- add the error
 					table.insert(spec_item_node.errors, err)
-					if spec_item_node.output ~= nil then
-						-- write the output
-						local err_output = utils.create_error_output(spec_item)
-						lib.files.write(spec_item_node.output, err_output)
-					end
+					-- prepare the output
+					local err_output = utils.create_error_output(spec_item)
+					-- set the node output
+					spec_item_node.output = async.fn.tempname()
+					-- write the output
+					lib.files.write(spec_item_node.output, err_output)
 					-- set the node short attribute
 					spec_item_node.short = spec_item_node.short .. ": " .. err.message
-				else
-					-- write the output
+				elseif spec_item.CapturedGinkgoWriterOutput ~= nil then
+					-- prepare the output
 					local spec_output = utils.create_spec_output(spec_item)
+					-- set the node output
+					spec_item_node.output = async.fn.tempname()
+					-- write the output
 					lib.files.write(spec_item_node.output, spec_output)
 				end
 
 				local spec_item_node_id = utils.create_location_id(spec_item)
+				-- set the node
 				collection[spec_item_node_id] = spec_item_node
 			end
 		end
