@@ -46,14 +46,14 @@ function adapter.discover_positions(file_path)
     ; -- Namespaces --
     ; Matches: `describe('subject')` and `context('case')`
     ((call_expression
-      function: (identifier) @func_name (#any-of? @func_name "Describe" "DescribeTable" "Context" "When")
+      function: (identifier) @func_name (#any-of? @func_name "Describe" "FDescribe" "PDescribe" "XDescribe" "DescribeTable" "FDescribeTable" "PDescribeTable" "XDescribeTable" "Context" "FContext" "PContext" "XContext" "When" "FWhen" "PWhen" "XWhen")
       arguments: (argument_list ((interpreted_string_literal) @namespace.name))
     )) @namespace.definition
 
     ; -- Tests --
     ; Matches: `it('test')`
     ((call_expression
-      function: (identifier) @func_name (#any-of? @func_name "It" "Entry")
+      function: (identifier) @func_name (#any-of? @func_name "It" "FIt" "PIt" "XIt" "Specify" "FSpecify" "PSpecify" "XSpecify" "Entry" "FEntry" "PEntry" "XEntry")
       arguments: (argument_list ((interpreted_string_literal) @test.name))
     )) @test.definition
   ]]
