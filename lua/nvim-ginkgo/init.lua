@@ -158,6 +158,7 @@ function adapter.results(spec, result, tree)
 		for _, spec_item in pairs(suite_item.SpecReports or {}) do
 			if spec_item.LeafNodeType == "It" then
 				local spec_item_node = {}
+				local spec_item_node_id = utils.create_location_id(spec_item)
 
 				if spec_item.State == "pending" then
 					spec_item_node.status = "skipped"
@@ -169,9 +170,10 @@ function adapter.results(spec, result, tree)
 					spec_item_node.status = spec_item.State
 				end
 
+				-- color definition
+				local spec_item_color = utils.get_color(spec_item)
 				-- set the node short attribute
-				spec_item_node.short = "[" .. string.upper(spec_item.State) .. "]"
-				spec_item_node.short = spec_item_node.short .. " " .. utils.create_spec_description(spec_item)
+				spec_item_node.short = utils.create_desc(spec_item, spec_item_color)
 				-- set the node location
 				spec_item_node.location = spec_item.LeafNodeLocation.LineNumber
 
@@ -192,14 +194,15 @@ function adapter.results(spec, result, tree)
 					spec_item_node.short = spec_item_node.short .. ": " .. err.message
 				elseif spec_item.CapturedGinkgoWriterOutput ~= nil then
 					-- prepare the output
-					local spec_output = utils.create_spec_output(spec_item)
+					local spec_output = utils.create_success_output(spec_item)
 					-- set the node output
 					spec_item_node.output = async.fn.tempname()
 					-- write the output
 					lib.files.write(spec_item_node.output, spec_output)
+				else
+					spec_item_node.short = nil
 				end
 
-				local spec_item_node_id = utils.create_location_id(spec_item)
 				-- set the node
 				collection[spec_item_node_id] = spec_item_node
 			end

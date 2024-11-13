@@ -3,25 +3,27 @@ local style = require("nvim-ginkgo.style")
 local utils = {}
 
 ---@return string
-function utils.create_location_id(spec)
-	local segments = {}
-	-- add the spec filename
-	table.insert(segments, spec.LeafNodeLocation.FileName)
-	-- add the spec hierarchy
-	for _, segment in pairs(spec.ContainerHierarchyTexts) do
-		table.insert(segments, '"' .. segment .. '"')
+function utils.create_success_output(spec)
+	local output = {}
+
+	local info_color = utils.get_color(spec)
+	local info_text = utils.create_desc(spec, info_color)
+
+	-- prepare the info
+	local info = {
+		spec_location = utils.create_location(spec.LeafNodeLocation),
+	}
+
+	-- prepare the output
+	table.insert(output, info_color .. style.clear .. info_text)
+	table.insert(output, style.gray .. info.spec_location)
+
+	if spec.CapturedGinkgoWriterOutput ~= nil then
+		table.insert(output, style.clear .. utils.format_output(spec.CapturedGinkgoWriterOutput))
 	end
-	-- add the spec text
-	table.insert(segments, '"' .. spec.LeafNodeText .. '"')
 
-	local id = table.concat(segments, "::")
 	-- done
-	return id
-end
-
----@return string
-function utils.create_location_path(spec)
-	return spec.FileName .. ":" .. spec.LineNumber
+	return table.concat(output, "\n") .. "\n"
 end
 
 function utils.create_error(spec)
@@ -40,96 +42,40 @@ function utils.create_error(spec)
 end
 
 ---@return string
-function utils.create_spec_output(spec)
-	local main = style.green
-
-	if spec.State == "pending" then
-		main = style.yellow
-	elseif spec.State == "skipped" then
-		main = style.cyan
-	end
-
-	local info_text = utils.create_spec_description(spec, main)
-	-- prepare the info
-	local info = {
-		spec_location = utils.create_location_path(spec.LeafNodeLocation),
-	}
-
-	local output = {}
-	-- prepare the output
-	table.insert(output, main .. style.clear .. info_text)
-	table.insert(output, style.gray .. info.spec_location)
-	table.insert(output, style.clear .. utils.get_output(spec))
-
-	-- done
-	return table.concat(output, "\n")
-end
-
----@return string
-function utils.create_spec_description(spec, color)
-	if color == nil then
-		color = ""
-	end
-
-	local spec_desc_texts = {}
-	-- prepare
-	for index, line in ipairs(spec.ContainerHierarchyTexts) do
-		local line_color = ""
-
-		if index % 2 == 0 then
-			line_color = style.gray
-		else
-			line_color = style.clear
-		end
-
-		table.insert(spec_desc_texts, line_color .. line)
-	end
-
-	local spec_desc = table.concat(spec_desc_texts, " ")
-	local spec_name = "[" .. spec.LeafNodeType .. "] " .. spec.LeafNodeText
-	-- done
-	return spec_desc .. " " .. color .. spec_name
-end
-
----@return string
 function utils.create_error_output(spec)
+	local info_color = utils.get_color(spec)
+	local info_text = utils.create_desc(spec, info_color)
+
 	local failure = spec.Failure
-
-	local main = style.red
-	-- find the main color
-	if spec.State == "panicked" then
-		main = style.magenta
-	end
-
-	local info_text = utils.create_spec_description(spec, main)
 	-- prepare the info
 	local info = {
 		failure_status = "[" .. string.upper(spec.State) .. "]",
 		failure_node_type = "[" .. failure.FailureNodeType .. "]",
-		failure_node_location = utils.create_location_path(failure.FailureNodeLocation),
-		failure_message = utils.get_error(failure),
-		failure_location = utils.create_location_path(failure.Location),
+		failure_node_location = utils.create_location(failure.FailureNodeLocation),
+		failure_message = utils.format_output(failure.Message),
+		failure_location = utils.create_location(failure.Location),
 		failure_stack_trace = failure.Location.FullStackTrace,
 	}
 
 	local output = {}
 	-- prepare the output
-	table.insert(output, main .. style.clear .. info_text)
-	table.insert(output, style.gray .. info.failure_location)
-	table.insert(output, main .. "\n  " .. info.failure_status .. " " .. info.failure_message)
+	table.insert(output, info_color .. style.clear .. info_text)
+	table.insert(output, style.gray .. info.failure_location .. "\n")
+	table.insert(output, info_color .. "  " .. info.failure_status .. " " .. info.failure_message)
 	table.insert(output, style.bold .. "  " .. "In " .. info.failure_node_type .. " at " .. info.failure_node_location)
 
 	if spec.CapturedGinkgoWriterOutput ~= nil then
-		table.insert(output, style.clear .. utils.get_output(spec))
+		table.insert(output, style.clear .. utils.format_output(spec.CapturedGinkgoWriterOutput))
 	end
 
 	if spec.State == "panicked" then
-		table.insert(output, style.clear .. main .. failure.ForwardedPanic)
-		table.insert(output, style.clear .. main .. "Full Stack Trace")
+		table.insert(output, style.clear .. info_color .. failure.ForwardedPanic)
+		table.insert(output, style.clear .. info_color .. "Full Stack Trace")
 		table.insert(output, style.clear .. info.failure_stack_trace)
 	end
+
 	-- done
-	return table.concat(output, "\n")
+	return table.concat(output, "\n") .. "\n"
 end
 
 ---Get a line in a buffer, defaulting to the first if none is specified
@@ -162,10 +108,53 @@ function utils.get_build_tags()
 end
 
 ---@return string
-function utils.get_output(item)
+function utils.get_color(spec)
+	local color = nil
+
+	if spec.Failure ~= nil then
+		color = style.red
+	else
+		color = style.green
+	end
+
+	if spec.State == "pending" then
+		color = style.yellow
+	elseif spec.State == "panicked" then
+		color = style.magenta
+	elseif spec.State == "skipped" then
+		color = style.cyan
+	end
+
+	return color
+end
+
+---@return string
+function utils.create_desc(spec, color)
+	local spec_desc_texts = {}
+	-- prepare
+	for index, line in ipairs(spec.ContainerHierarchyTexts) do
+		local line_color = ""
+
+		if index % 2 == 0 then
+			line_color = style.gray
+		else
+			line_color = style.clear
+		end
+
+		table.insert(spec_desc_texts, line_color .. line)
+	end
+
+	local spec_desc = table.concat(spec_desc_texts, " ")
+	local spec_name = "[" .. spec.LeafNodeType .. "] " .. spec.LeafNodeText
+	-- done
+	return spec_desc .. " " .. color .. spec_name
+end
+
+---@return string
+function utils.format_output(message)
 	local output = {}
 	-- tab
-	for line in string.gmatch(item.CapturedGinkgoWriterOutput, "([^\n]+)") do
+	for line in string.gmatch(message, "([^\n]+)") do
 		table.insert(output, "  " .. line)
 	end
 	-- done
@@ -173,14 +162,25 @@ function utils.get_output(item)
 end
 
 ---@return string
-function utils.get_error(item)
-	local output = {}
-	-- tab
-	for line in string.gmatch(item.Message, "([^\n]+)") do
-		table.insert(output, "  " .. line)
+function utils.create_location_id(spec)
+	local segments = {}
+	-- add the spec filename
+	table.insert(segments, spec.LeafNodeLocation.FileName)
+	-- add the spec hierarchy
+	for _, segment in pairs(spec.ContainerHierarchyTexts) do
+		table.insert(segments, '"' .. segment .. '"')
 	end
+	-- add the spec text
+	table.insert(segments, '"' .. spec.LeafNodeText .. '"')
+
+	local id = table.concat(segments, "::")
 	-- done
-	return table.concat(output, "\n")
+	return id
+end
+
+---@return string
+function utils.create_location(spec)
+	return spec.FileName .. ":" .. spec.LineNumber
 end
 
 return utils
