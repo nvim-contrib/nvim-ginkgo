@@ -71,15 +71,14 @@ function adapter.build_spec(args)
 
 	table.insert(cargs, "ginkgo")
 	table.insert(cargs, "run")
-	table.insert(cargs, "-v")
 	table.insert(cargs, "--keep-going")
 	table.insert(cargs, "--output-dir")
 	table.insert(cargs, report_directory)
 	table.insert(cargs, "--json-report")
 	table.insert(cargs, report_filename)
 
-	-- prepare the focus
 	local position = args.tree:data()
+	-- prepare the focus
 	if position.type == "test" or position.type == "namespace" then
 		-- pos.id in form "path/to/file::Describe text::test text"
 		local name = string.sub(position.id, string.find(position.id, "::") + 2)
