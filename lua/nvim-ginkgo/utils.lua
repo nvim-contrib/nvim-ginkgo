@@ -183,4 +183,16 @@ function utils.create_location(spec)
 	return spec.FileName .. ":" .. spec.LineNumber
 end
 
+---@param position neotest.Position
+---@return string
+function utils.create_position_focus(position)
+	-- pos.id in form "path/to/file::Describe text::test text"
+	local name = string.sub(position.id, string.find(position.id, "::") + 2)
+	name, _ = string.gsub(name, "::", " ")
+	name, _ = string.gsub(name, '"', "")
+	-- prepare the pattern
+	-- https://github.com/onsi/ginkgo/issues/1126#issuecomment-1409245937
+	return "'\\b" .. name .. "\\b'"
+end
+
 return utils

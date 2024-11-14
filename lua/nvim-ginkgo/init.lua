@@ -4,8 +4,7 @@ local async = require("neotest.async")
 local logger = require("neotest.logging")
 local utils = require("nvim-ginkgo.utils")
 
----@class neotest.Adapter
----@field name string
+---@type neotest.Adapter
 local adapter = { name = "nvim-ginkgo" }
 
 ---Find the project root directory given a current directory to work from.
@@ -71,33 +70,31 @@ function adapter.build_spec(args)
 
 	table.insert(cargs, "ginkgo")
 	table.insert(cargs, "run")
-	table.insert(cargs, "-v")
 	table.insert(cargs, "--keep-going")
 	table.insert(cargs, "--output-dir")
 	table.insert(cargs, report_directory)
 	table.insert(cargs, "--json-report")
 	table.insert(cargs, report_filename)
 
-	-- prepare the focus
 	local position = args.tree:data()
-	if position.type == "test" or position.type == "namespace" then
-		-- pos.id in form "path/to/file::Describe text::test text"
-		local name = string.sub(position.id, string.find(position.id, "::") + 2)
-		name, _ = string.gsub(name, "::", " ")
-		name, _ = string.gsub(name, '"', "")
-		-- prepare the pattern
-		-- https://github.com/onsi/ginkgo/issues/1126#issuecomment-1409245937
-		local pattern = "'\\b" .. name .. "\\b'"
-		-- prepare tha arguments
-		table.insert(cargs, "--focus")
-		table.insert(cargs, pattern)
-	end
-
 	local directory = position.path
 	-- The path for the position is not a directory, ensure the directory variable refers to one
 	if vim.fn.isdirectory(position.path) ~= 1 then
+		local focus_file_path = position.path
+		-- prepare the focus path
+		if position.type == "test" or position.type == "namespace" then
+			local line_number = position.range[1] + 1
+			-- replace the focus_file_path with its line number
+			focus_file_path = position.path .. ":" .. line_number
+			-- create the focus pattern
+			local focus_pattern = utils.create_position_focus(position)
+			-- prepare tha arguments
+			table.insert(cargs, "--focus")
+			table.insert(cargs, focus_pattern)
+		end
+
 		table.insert(cargs, "--focus-file")
-		table.insert(cargs, position.path)
+		table.insert(cargs, focus_file_path)
 		-- find the directory
 		directory = vim.fn.fnamemodify(position.path, ":h")
 	end
