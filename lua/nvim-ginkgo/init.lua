@@ -57,7 +57,13 @@ function adapter.discover_positions(file_path)
     )) @test.definition
   ]]
 
-	return lib.treesitter.parse_positions(file_path, query, { nested_namespaces = true, require_namespaces = true })
+	local options = {
+		nested_namespaces = true,
+		require_namespaces = true,
+		build_position = utils.create_position,
+	}
+
+	return lib.treesitter.parse_positions(file_path, query, options)
 end
 
 ---@param args neotest.RunArgs
@@ -106,7 +112,7 @@ function adapter.build_spec(args)
 	end
 
 	table.insert(cargs, directory .. plenary.path.sep .. "...")
-
+	-- done!
 	return {
 		command = table.concat(cargs, " "),
 		context = {
