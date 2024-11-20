@@ -183,10 +183,47 @@ function utils.create_location(spec)
 	return spec.FileName .. ":" .. spec.LineNumber
 end
 
+---@param file_path string
+---@param source number
+---@param captured_nodes table
+---@return neotest.Position|nil
+function utils.create_position(file_path, source, captured_nodes)
+	local function get_match_type()
+		if captured_nodes["test.name"] then
+			return "test"
+		end
+		if captured_nodes["namespace.name"] then
+			return "namespace"
+		end
+	end
+
+	local match_type = get_match_type()
+	-- if we have a match
+	if match_type then
+		---@type string
+		local name = vim.treesitter.get_node_text(captured_nodes[match_type .. ".name"], source)
+		local match_name = vim.treesitter.get_node_text(captured_nodes["func_name"], source)
+		local definition = captured_nodes[match_type .. ".definition"]
+
+		name, _ = string.gsub(name, '"', "")
+		-- prepare the name
+		if match_name == "When" then
+			name = string.lower(match_name) .. " " .. name
+		end
+
+		return {
+			type = match_type,
+			path = file_path,
+			name = '"' .. name .. '"',
+			range = { definition:range() },
+		}
+	end
+end
+
 ---@param position neotest.Position
 ---@return string
 function utils.create_position_focus(position)
-	-- pos.id in form "path/to/file::Describe text::test text"
+	-- pos.id in form "path/to/file::describe text::test text"
 	local name = string.sub(position.id, string.find(position.id, "::") + 2)
 	name, _ = string.gsub(name, "::", " ")
 	name, _ = string.gsub(name, '"', "")
