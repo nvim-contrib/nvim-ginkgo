@@ -74,13 +74,13 @@ function adapter.build_spec(args)
 	local report_directory = vim.fn.fnamemodify(report_path, ":h")
 	local cargs = {}
 
-	table.insert(cargs, "ginkgo")
-	table.insert(cargs, "run")
+	table.insert(cargs, "ginkgo run -v")
 	table.insert(cargs, "--keep-going")
 	table.insert(cargs, "--output-dir")
 	table.insert(cargs, report_directory)
 	table.insert(cargs, "--json-report")
 	table.insert(cargs, report_filename)
+	table.insert(cargs, "--silence-skips")
 
 	local position = args.tree:data()
 	local directory = position.path
