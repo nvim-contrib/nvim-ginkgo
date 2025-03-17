@@ -229,7 +229,7 @@ function utils.create_position_focus(position)
 	name, _ = string.gsub(name, '"', "")
 	-- prepare the pattern
 	-- https://github.com/onsi/ginkgo/issues/1126#issuecomment-1409245937
-	return "'\\b" .. name .. "\\b'"
+	return "\\b" .. name .. "\\b"
 end
 
 return utils
