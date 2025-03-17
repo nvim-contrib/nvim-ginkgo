@@ -1,11 +1,22 @@
-local lib = require("neotest.lib")
-local plenary = require("plenary.path")
 local async = require("neotest.async")
+local config = require("nvim-ginkgo.config")
+local dap = require("nvim-ginkgo.strategies.dap")
+local lib = require("neotest.lib")
 local logger = require("neotest.logging")
+local plenary = require("plenary.path")
 local utils = require("nvim-ginkgo.utils")
 
----@type neotest.Adapter
+---@class nvim-ginkgo.Adapter: neotest.Adapter
+---@field setup fun(config: nvim-ginkgo.Config): nil
+
+---@type nvim-ginkgo.Adapter
+---@diagnostic disable-next-line: missing-fields
 local adapter = { name = "nvim-ginkgo" }
+
+---@param config nvim-ginkgo.Config
+function adapter.setup(c)
+	require("nvim-ginkgo.config").setup(c)
+end
 
 ---Find the project root directory given a current directory to work from.
 ---Should no root be found, the adapter can still be used in a non-project context if a test file matches.
@@ -69,38 +80,39 @@ end
 ---@param args neotest.RunArgs
 ---@return nil | neotest.RunSpec | neotest.RunSpec[]
 function adapter.build_spec(args)
-	local report_path = async.fn.tempname()
-	local report_filename = vim.fn.fnamemodify(report_path, ":t")
-	local report_directory = vim.fn.fnamemodify(report_path, ":h")
-	local cargs = {}
+	local c = config.read()
 
-	table.insert(cargs, "ginkgo run -v")
-	table.insert(cargs, "--keep-going")
-	table.insert(cargs, "--output-dir")
-	table.insert(cargs, report_directory)
-	table.insert(cargs, "--json-report")
-	table.insert(cargs, report_filename)
-	table.insert(cargs, "--silence-skips")
+	local report_path = async.fn.tempname()
+
+	local cargs = {}
+	vim.list_extend(cargs, {
+		"--keep-going",
+		"--json-report",
+		report_path,
+		"--silence-skips",
+	})
 
 	local position = args.tree:data()
 	local directory = position.path
+	---@type string
+	local focus_file_path = directory
+	---@type string?
+	local focus_pattern
+
 	-- The path for the position is not a directory, ensure the directory variable refers to one
 	if vim.fn.isdirectory(position.path) ~= 1 then
-		local focus_file_path = position.path
 		-- prepare the focus path
 		if position.type == "test" or position.type == "namespace" then
 			local line_number = position.range[1] + 1
 			-- replace the focus_file_path with its line number
 			focus_file_path = position.path .. ":" .. line_number
 			-- create the focus pattern
-			local focus_pattern = utils.create_position_focus(position)
-			-- prepare tha arguments
-			table.insert(cargs, "--focus")
-			table.insert(cargs, focus_pattern)
+			focus_pattern = utils.create_position_focus(position)
+
+			vim.list_extend(cargs, { "--focus", focus_pattern })
 		end
 
-		table.insert(cargs, "--focus-file")
-		table.insert(cargs, focus_file_path)
+		vim.list_extend(cargs, { "--focus-file", focus_file_path })
 		-- find the directory
 		directory = vim.fn.fnamemodify(position.path, ":h")
 	end
@@ -111,10 +123,14 @@ function adapter.build_spec(args)
 		table.insert(cargs, value)
 	end
 
-	table.insert(cargs, directory .. plenary.path.sep .. "...")
-	-- done!
-	return {
-		command = table.concat(cargs, " "),
+	local command = {}
+	vim.list_extend(command, c.command)
+	vim.list_extend(command, cargs)
+	vim.list_extend(command, { directory .. plenary.path.sep .. "..." })
+
+	---@type nil | neotest.RunSpec | neotest.RunSpec[]
+	local spec = {
+		command = command,
 		context = {
 			-- input
 			report_input_type = position.type,
@@ -123,6 +139,29 @@ function adapter.build_spec(args)
 			report_output_path = report_path,
 		},
 	}
+
+	if args.strategy == "dap" then
+		dap.setup_debugging(directory)
+
+		local dap_args = vim.deepcopy(c.dap.args)
+
+		-- only some of the arguments are valid here so we can not directly use cargs
+		vim.list_extend(dap_args, {
+			"--ginkgo.json-report",
+			report_path,
+			"--ginkgo.silence-skips",
+			"--ginkgo.focus-file",
+			focus_file_path,
+		})
+
+		if focus_pattern then
+			vim.list_extend(dap_args, { "--ginkgo.focus", focus_pattern })
+		end
+
+		spec.strategy = dap.get_dap_config(directory, dap_args)
+	end
+
+	return spec
 end
 
 ---@async
