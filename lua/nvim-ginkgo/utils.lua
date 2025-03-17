@@ -227,9 +227,14 @@ function utils.create_position_focus(position)
 	local name = string.sub(position.id, string.find(position.id, "::") + 2)
 	name, _ = string.gsub(name, "::", " ")
 	name, _ = string.gsub(name, '"', "")
+	-- TODO: there is a problem with slashes for sure!
+	name, _ = string.gsub(name, "/", "\\/")
+	-- escape some pattern characters
+	name, _ = string.gsub(name, "([%.%+%-%*%?%[%]%(%)%$%^%|])", "\\%1")
+
 	-- prepare the pattern
 	-- https://github.com/onsi/ginkgo/issues/1126#issuecomment-1409245937
-	return "'\\b" .. name .. "\\b'"
+	return "\\b" .. name .. "\\b"
 end
 
 return utils
