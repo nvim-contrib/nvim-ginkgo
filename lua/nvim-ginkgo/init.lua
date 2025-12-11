@@ -4,6 +4,7 @@ local dap = require("nvim-ginkgo.strategies.dap")
 local lib = require("neotest.lib")
 local logger = require("neotest.logging")
 local plenary = require("plenary.path")
+local query = require("nvim-ginkgo.query")
 local utils = require("nvim-ginkgo.utils")
 
 ---@class nvim-ginkgo.Adapter: neotest.Adapter
@@ -14,8 +15,11 @@ local utils = require("nvim-ginkgo.utils")
 local adapter = { name = "nvim-ginkgo" }
 
 ---@param config nvim-ginkgo.Config
+---@return nvim-ginkgo.Adapter
 function adapter.setup(c)
 	require("nvim-ginkgo.config").setup(c)
+
+	return adapter
 end
 
 ---Find the project root directory given a current directory to work from.
@@ -44,6 +48,7 @@ function adapter.is_test_file(file_path)
 
 	local file_path_segments = vim.split(file_path, plenary.path.sep)
 	local file_path_basename = file_path_segments[#file_path_segments]
+
 	return vim.endswith(file_path_basename, "_test.go")
 end
 
@@ -52,29 +57,7 @@ end
 ---@param file_path string Absolute file path
 ---@return neotest.Tree | nil
 function adapter.discover_positions(file_path)
-	local query = [[
-    ; -- Namespaces --
-    ; Matches: `describe('subject')` and `context('case')`
-    ((call_expression
-      function: (identifier) @func_name (#any-of? @func_name "Describe" "FDescribe" "PDescribe" "XDescribe" "DescribeTable" "FDescribeTable" "PDescribeTable" "XDescribeTable" "Context" "FContext" "PContext" "XContext" "When" "FWhen" "PWhen" "XWhen")
-      arguments: (argument_list ((interpreted_string_literal) @namespace.name))
-    )) @namespace.definition
-
-    ; -- Tests --
-    ; Matches: `it('test')`
-    ((call_expression
-      function: (identifier) @func_name (#any-of? @func_name "It" "FIt" "PIt" "XIt" "Specify" "FSpecify" "PSpecify" "XSpecify" "Entry" "FEntry" "PEntry" "XEntry")
-      arguments: (argument_list ((interpreted_string_literal) @test.name))
-    )) @test.definition
-  ]]
-
-	local options = {
-		nested_namespaces = true,
-		require_namespaces = true,
-		build_position = utils.create_position,
-	}
-
-	return lib.treesitter.parse_positions(file_path, query, options)
+	return query.parse(file_path)
 end
 
 ---@param args neotest.RunArgs
@@ -198,7 +181,7 @@ function adapter.results(spec, result, tree)
 		end
 
 		for _, spec_item in pairs(suite_item.SpecReports or {}) do
-			if spec_item.LeafNodeType == "It" then
+			if spec_item.LeafNodeType == "It" or spec_item.LeafNodeType == "Entry" then
 				local spec_item_node = {}
 				local spec_item_node_id = utils.create_location_id(spec_item)
 
