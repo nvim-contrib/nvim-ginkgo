@@ -5,7 +5,8 @@ local lib = require("neotest.lib")
 local logger = require("neotest.logging")
 local plenary = require("plenary.path")
 local query = require("nvim-ginkgo.query")
-local utils = require("nvim-ginkgo.utils")
+local output = require("nvim-ginkgo.output")
+local location = require("nvim-ginkgo.location")
 
 ---@class nvim-ginkgo.Adapter: neotest.Adapter
 ---@field setup fun(config: nvim-ginkgo.Config): nil
@@ -90,7 +91,7 @@ function adapter.build_spec(args)
 			-- replace the focus_file_path with its line number
 			focus_file_path = position.path .. ":" .. line_number
 			-- create the focus pattern
-			focus_pattern = utils.create_position_focus(position)
+			focus_pattern = location.create_position_focus(position)
 
 			vim.list_extend(cargs, { "--focus", focus_pattern })
 		end
@@ -183,7 +184,7 @@ function adapter.results(spec, result, tree)
 		for _, spec_item in pairs(suite_item.SpecReports or {}) do
 			if spec_item.LeafNodeType == "It" or spec_item.LeafNodeType == "Entry" then
 				local spec_item_node = {}
-				local spec_item_node_id = utils.create_location_id(spec_item)
+				local spec_item_node_id = location.create_location_id(spec_item)
 
 				if spec_item.State == "pending" then
 					spec_item_node.status = "skipped"
@@ -196,9 +197,9 @@ function adapter.results(spec, result, tree)
 				end
 
 				-- color definition
-				local spec_item_color = utils.get_color(spec_item)
+				local spec_item_color = output.get_color(spec_item)
 				-- set the node short attribute
-				spec_item_node.short = utils.create_desc(spec_item, spec_item_color)
+				spec_item_node.short = output.create_desc(spec_item, spec_item_color)
 				-- set the node location
 				spec_item_node.location = spec_item.LeafNodeLocation.LineNumber
 
@@ -206,11 +207,11 @@ function adapter.results(spec, result, tree)
 				if spec_item.Failure ~= nil then
 					spec_item_node.errors = {}
 
-					local err = utils.create_error(spec_item)
+					local err = output.create_error(spec_item)
 					-- add the error
 					table.insert(spec_item_node.errors, err)
 					-- prepare the output
-					local err_output = utils.create_error_output(spec_item)
+					local err_output = output.create_error_output(spec_item)
 					-- set the node output
 					spec_item_node.output = async.fn.tempname()
 					-- write the output
@@ -219,7 +220,7 @@ function adapter.results(spec, result, tree)
 					spec_item_node.short = spec_item_node.short .. ": " .. err.message
 				elseif spec_item.CapturedGinkgoWriterOutput ~= nil then
 					-- prepare the output
-					local spec_output = utils.create_success_output(spec_item)
+					local spec_output = output.create_success_output(spec_item)
 					-- set the node output
 					spec_item_node.output = async.fn.tempname()
 					-- write the output

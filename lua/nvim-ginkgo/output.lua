@@ -1,4 +1,5 @@
 local style = require("nvim-ginkgo.style")
+local location = require("nvim-ginkgo.location")
 
 local M = {}
 
@@ -11,7 +12,7 @@ function M.create_success_output(spec)
 
 	-- prepare the info
 	local info = {
-		spec_location = M.create_location(spec.LeafNodeLocation),
+		spec_location = location.create_location(spec.LeafNodeLocation),
 	}
 
 	-- prepare the output
@@ -51,9 +52,9 @@ function M.create_error_output(spec)
 	local info = {
 		failure_status = "[" .. string.upper(spec.State) .. "]",
 		failure_node_type = "[" .. failure.FailureNodeType .. "]",
-		failure_node_location = M.create_location(failure.FailureNodeLocation),
+		failure_node_location = location.create_location(failure.FailureNodeLocation),
 		failure_message = M.format_output(failure.Message),
-		failure_location = M.create_location(failure.Location),
+		failure_location = location.create_location(failure.Location),
 		failure_stack_trace = failure.Location.FullStackTrace,
 	}
 
@@ -159,84 +160,6 @@ function M.format_output(message)
 	end
 	-- done
 	return table.concat(output, "\n")
-end
-
----@return string
-function M.create_location_id(spec)
-	local segments = {}
-	-- add the spec filename
-	table.insert(segments, spec.LeafNodeLocation.FileName)
-
-	local hierarchy = {}
-	for _, segment in pairs(spec.ContainerHierarchyTexts) do
-		table.insert(hierarchy, segment)
-	end
-
-	for _, segment in pairs(hierarchy) do
-		table.insert(segments, '"' .. segment .. '"')
-	end
-	-- add the spec text
-	table.insert(segments, '"' .. spec.LeafNodeText .. '"')
-
-	local id = table.concat(segments, "::")
-	-- done
-	return id
-end
-
----@return string
-function M.create_location(spec)
-	return spec.FileName .. ":" .. spec.LineNumber
-end
-
----@param file_path string
----@param source number
----@param captured_nodes table
----@return neotest.Position|nil
-function M.create_position(file_path, source, captured_nodes)
-	local function get_match_type()
-		if captured_nodes["test.name"] then
-			return "test"
-		end
-		if captured_nodes["namespace.name"] then
-			return "namespace"
-		end
-	end
-
-	local match_type = get_match_type()
-	-- if we have a match
-	if match_type then
-		---@type string
-		local name = vim.treesitter.get_node_text(captured_nodes[match_type .. ".name"], source)
-		local match_name = vim.treesitter.get_node_text(captured_nodes["func_name"], source)
-		local definition = captured_nodes[match_type .. ".definition"]
-
-		name, _ = string.gsub(name, '"', "")
-		-- prepare the name
-		if match_name == "When" then
-			name = string.lower(match_name) .. " " .. name
-		end
-
-		return {
-			type = match_type,
-			path = file_path,
-			name = '"' .. name .. '"',
-			range = { definition:range() },
-		}
-	end
-end
-
----Generate a Ginkgo focus pattern for a position
----@param position neotest.Position
----@return string
-function M.create_position_focus(position)
-	-- Build focus pattern from full position path
-	local name = string.sub(position.id, string.find(position.id, "::") + 2)
-	name = name:gsub("::", " ")
-	name = name:gsub('"', "")
-	name = name:gsub("/", "\\/")
-	name = name:gsub("([%.%+%-%*%?%[%]%(%)%$%^%|])", "\\%1")
-
-	return "\\b" .. name .. "\\b"
 end
 
 return M
