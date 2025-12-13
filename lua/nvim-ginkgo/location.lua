@@ -32,13 +32,22 @@ end
 ---@return string
 function M.create_position_focus(position)
 	-- Build focus pattern from full position path
+	local logger = require("neotest.logging")
+	logger.debug("create_position_focus: position.id = " .. position.id)
+	logger.debug("create_position_focus: position.name = " .. position.name)
+
 	local name = string.sub(position.id, string.find(position.id, "::") + 2)
+	logger.debug("create_position_focus: extracted name = " .. name)
+
 	name = name:gsub("::", " ")
 	name = name:gsub('"', "")
 	name = name:gsub("/", "\\/")
 	name = name:gsub("([%.%+%-%*%?%[%]%(%)%$%^%|])", "\\%1")
 
-	return "\\b" .. name .. "\\b"
+	local pattern = "\\b" .. name .. "\\b"
+	logger.debug("create_position_focus: final pattern = " .. pattern)
+
+	return pattern
 end
 
 return M
