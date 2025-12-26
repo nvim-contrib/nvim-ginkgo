@@ -220,6 +220,15 @@ function utils.create_position(file_path, source, captured_nodes)
 	end
 end
 
+---@param pattern string
+---@return string
+function utils.escape_pattern(pattern)
+	-- escape all special characters for go regex
+	-- special characters are: \^$.|?*+(){}[]
+	local specials = "[\\^$.|?*+(){}\\[\\]]"
+	return string.gsub(pattern, specials, "\\%1")
+end
+
 ---@param position neotest.Position
 ---@return string
 function utils.create_position_focus(position)
@@ -227,6 +236,8 @@ function utils.create_position_focus(position)
 	local name = string.sub(position.id, string.find(position.id, "::") + 2)
 	name, _ = string.gsub(name, "::", " ")
 	name, _ = string.gsub(name, '"', "")
+	-- escape the pattern
+	name = utils.escape_pattern(name)
 	-- prepare the pattern
 	-- https://github.com/onsi/ginkgo/issues/1126#issuecomment-1409245937
 	return "'\\b" .. name .. "\\b'"
