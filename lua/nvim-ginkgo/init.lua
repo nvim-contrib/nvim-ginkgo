@@ -20,7 +20,8 @@ adapter.root = lib.files.match_root_pattern("go.mod", "go.sum")
 ---@param root string Root directory of project
 ---@return boolean
 function adapter.filter_dir(name, rel_path, root)
-	return rel_path ~= "vendor"
+	-- exclude vendor directories at any level
+	return name ~= "vendor"
 end
 
 ---@async
@@ -83,6 +84,15 @@ function adapter.build_spec(args)
 	table.insert(cargs, "--silence-skips")
 
 	local position = args.tree:data()
+
+	-- add build tags if present in the test file
+	local test_file_path = position.path
+	if vim.fn.isdirectory(test_file_path) ~= 1 then
+		local build_tags = utils.get_build_tags(test_file_path)
+		if build_tags ~= "" then
+			table.insert(cargs, build_tags)
+		end
+	end
 	local directory = position.path
 	-- The path for the position is not a directory, ensure the directory variable refers to one
 	if vim.fn.isdirectory(position.path) ~= 1 then
@@ -158,8 +168,11 @@ function adapter.results(spec, result, tree)
 			collection[suite_item_node_id] = suite_item_node
 		end
 
+		-- leaf node types that represent test cases
+		local test_leaf_types = { It = true, Specify = true, Entry = true }
+
 		for _, spec_item in pairs(suite_item.SpecReports or {}) do
-			if spec_item.LeafNodeType == "It" then
+			if test_leaf_types[spec_item.LeafNodeType] then
 				local spec_item_node = {}
 				local spec_item_node_id = utils.create_location_id(spec_item)
 
@@ -181,7 +194,7 @@ function adapter.results(spec, result, tree)
 				spec_item_node.location = spec_item.LeafNodeLocation.LineNumber
 
 				-- set the node errors
-				if spec_item.Failure ~= nil then
+				if spec_item.Failure then
 					spec_item_node.errors = {}
 
 					local err = utils.create_error(spec_item)
@@ -195,7 +208,7 @@ function adapter.results(spec, result, tree)
 					lib.files.write(spec_item_node.output, err_output)
 					-- set the node short attribute
 					spec_item_node.short = spec_item_node.short .. ": " .. err.message
-				elseif spec_item.CapturedGinkgoWriterOutput ~= nil then
+				elseif spec_item.CapturedGinkgoWriterOutput then
 					-- prepare the output
 					local spec_output = utils.create_success_output(spec_item)
 					-- set the node output
@@ -217,5 +230,5 @@ function adapter.results(spec, result, tree)
 	return collection
 end
 
---the adatper
+-- the adapter
 return adapter

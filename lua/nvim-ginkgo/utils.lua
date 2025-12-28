@@ -18,7 +18,7 @@ function utils.create_success_output(spec)
 	table.insert(output, info_color .. style.clear .. info_text)
 	table.insert(output, style.gray .. info.spec_location)
 
-	if spec.CapturedGinkgoWriterOutput ~= nil then
+	if spec.CapturedGinkgoWriterOutput then
 		table.insert(output, style.clear .. utils.format_output(spec.CapturedGinkgoWriterOutput))
 	end
 
@@ -26,6 +26,7 @@ function utils.create_success_output(spec)
 	return table.concat(output, "\n") .. "\n"
 end
 
+---@return table
 function utils.create_error(spec)
 	local failure = spec.Failure
 
@@ -64,7 +65,7 @@ function utils.create_error_output(spec)
 	table.insert(output, info_color .. "  " .. info.failure_status .. " " .. info.failure_message)
 	table.insert(output, style.bold .. "  " .. "In " .. info.failure_node_type .. " at " .. info.failure_node_location)
 
-	if spec.CapturedGinkgoWriterOutput ~= nil then
+	if spec.CapturedGinkgoWriterOutput then
 		table.insert(output, style.clear .. utils.format_output(spec.CapturedGinkgoWriterOutput))
 	end
 
@@ -78,19 +79,26 @@ function utils.create_error_output(spec)
 	return table.concat(output, "\n") .. "\n"
 end
 
----Get a line in a buffer, defaulting to the first if none is specified
----@param buf number
----@param nr number?
----@return string
-local function get_buf_line(buf, nr)
-	nr = nr or 0
-	assert(buf and type(buf) == "number", "A buffer is required to get the first line")
-	return vim.trim(vim.api.nvim_buf_get_lines(buf, nr, nr + 1, false)[1])
+---Get the first line of a file
+---@param file_path string
+---@return string|nil
+local function get_first_line(file_path)
+	local file = io.open(file_path, "r")
+	if not file then
+		return nil
+	end
+	local line = file:read("*l")
+	file:close()
+	return line and vim.trim(line) or nil
 end
 
+---@param file_path string
 ---@return string
-function utils.get_build_tags()
-	local line = get_buf_line(0)
+function utils.get_build_tags(file_path)
+	local line = get_first_line(file_path)
+	if not line then
+		return ""
+	end
 	local tag_style
 	for _, item in ipairs({ "// +build ", "//go:build " }) do
 		if vim.startswith(line, item) then
@@ -109,23 +117,18 @@ end
 
 ---@return string
 function utils.get_color(spec)
-	local color = nil
-
-	if spec.Failure ~= nil then
-		color = style.red
-	else
-		color = style.green
-	end
-
+	-- check state first as it takes precedence
 	if spec.State == "pending" then
-		color = style.yellow
+		return style.yellow
 	elseif spec.State == "panicked" then
-		color = style.magenta
+		return style.magenta
 	elseif spec.State == "skipped" then
-		color = style.cyan
+		return style.cyan
+	elseif spec.Failure then
+		return style.red
+	else
+		return style.green
 	end
-
-	return color
 end
 
 ---@return string
@@ -224,7 +227,12 @@ end
 ---@return string
 function utils.create_position_focus(position)
 	-- pos.id in form "path/to/file::describe text::test text"
-	local name = string.sub(position.id, string.find(position.id, "::") + 2)
+	local sep_pos = string.find(position.id, "::")
+	if not sep_pos then
+		-- fallback to match all tests if no separator found
+		return "'.*'"
+	end
+	local name = string.sub(position.id, sep_pos + 2)
 	name, _ = string.gsub(name, "::", " ")
 	name, _ = string.gsub(name, '"', "")
 	-- prepare the pattern
