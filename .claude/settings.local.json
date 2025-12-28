@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_filesystem-mcp_filesystem__directory_tree",
+      "Bash(git -C /Users/iamralch/Projects/github.com/nvim-contrib/nvim-ginkgo log --oneline -20)",
+      "Bash(cat:*)"
+    ]
+  }
+}

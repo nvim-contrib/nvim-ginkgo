@@ -2,6 +2,76 @@ local style = require("nvim-ginkgo.style")
 
 local utils = {}
 
+---Format timing information
+---@param spec table The spec report
+---@return string|nil Formatted timing string or nil
+local function format_timing(spec)
+	if not spec.StartTime and not spec.EndTime then
+		return nil
+	end
+
+	local parts = {}
+
+	-- format start time if available
+	if spec.StartTime and spec.StartTime ~= "" then
+		-- StartTime is in RFC3339 format, extract just the time portion
+		local time_part = spec.StartTime:match("T([%d:]+)")
+		if time_part then
+			table.insert(parts, "started: " .. time_part)
+		end
+	end
+
+	-- format end time if available
+	if spec.EndTime and spec.EndTime ~= "" then
+		local time_part = spec.EndTime:match("T([%d:]+)")
+		if time_part then
+			table.insert(parts, "ended: " .. time_part)
+		end
+	end
+
+	if #parts > 0 then
+		return table.concat(parts, ", ")
+	end
+	return nil
+end
+
+---Format report entries for output
+---@param entries table[] Array of report entries
+---@return string[] Array of formatted lines
+local function format_report_entries(entries)
+	local lines = {}
+	for _, entry in ipairs(entries) do
+		local entry_name = entry.Name or "unnamed"
+		local entry_loc = entry.Location and utils.create_location(entry.Location) or ""
+		local entry_value = ""
+
+		-- handle different value types
+		if entry.StringRepresentation then
+			entry_value = entry.StringRepresentation
+		elseif type(entry.Value) == "string" then
+			entry_value = entry.Value
+		elseif type(entry.Value) == "table" then
+			-- try to serialize table
+			local ok, json = pcall(vim.json.encode, entry.Value)
+			entry_value = ok and json or vim.inspect(entry.Value)
+		elseif entry.Value ~= nil then
+			entry_value = tostring(entry.Value)
+		end
+
+		-- format the entry
+		local header = style.cyan .. "  [" .. entry_name .. "]"
+		if entry_loc ~= "" then
+			header = header .. style.gray .. " at " .. entry_loc
+		end
+		table.insert(lines, header)
+
+		if entry_value ~= "" then
+			table.insert(lines, style.clear .. utils.format_output(entry_value))
+		end
+	end
+	return lines
+end
+
 ---@return string
 function utils.create_success_output(spec)
 	local output = {}
@@ -17,6 +87,12 @@ function utils.create_success_output(spec)
 	table.insert(output, info_color .. style.clear .. info_text)
 	table.insert(output, style.gray .. spec_location)
 
+	-- include timing details
+	local timing = format_timing(spec)
+	if timing then
+		table.insert(output, style.gray .. "  " .. timing)
+	end
+
 	-- include GinkgoWriter output
 	if spec.CapturedGinkgoWriterOutput and spec.CapturedGinkgoWriterOutput ~= "" then
 		table.insert(output, style.clear .. "\n" .. style.gray .. "GinkgoWriter output:")
@@ -27,6 +103,15 @@ function utils.create_success_output(spec)
 	if spec.CapturedStdOutErr and spec.CapturedStdOutErr ~= "" then
 		table.insert(output, style.clear .. "\n" .. style.gray .. "stdout/stderr:")
 		table.insert(output, style.clear .. utils.format_output(spec.CapturedStdOutErr))
+	end
+
+	-- include report entries (custom data from AddReportEntry)
+	if spec.ReportEntries and #spec.ReportEntries > 0 then
+		table.insert(output, style.clear .. "\n" .. style.gray .. "Report Entries:")
+		local entry_lines = format_report_entries(spec.ReportEntries)
+		for _, line in ipairs(entry_lines) do
+			table.insert(output, line)
+		end
 	end
 
 	-- done
@@ -88,6 +173,12 @@ function utils.create_error_output(spec)
 	table.insert(output, info_color .. "  " .. failure_status .. " " .. failure_message)
 	table.insert(output, style.bold .. "  " .. "In " .. failure_node_type .. " at " .. failure_node_location)
 
+	-- include timing details
+	local timing = format_timing(spec)
+	if timing then
+		table.insert(output, style.gray .. "  " .. timing)
+	end
+
 	-- include GinkgoWriter output
 	if spec.CapturedGinkgoWriterOutput and spec.CapturedGinkgoWriterOutput ~= "" then
 		table.insert(output, style.clear .. "\n" .. style.gray .. "GinkgoWriter output:")
@@ -120,6 +211,15 @@ function utils.create_error_output(spec)
 			local addl_node_type = addl_failure.FailureNodeType or "UNKNOWN"
 			table.insert(output, style.red .. "  [" .. i .. "] " .. addl_node_type .. " at " .. addl_loc)
 			table.insert(output, style.clear .. "      " .. addl_msg)
+		end
+	end
+
+	-- include report entries (custom data from AddReportEntry)
+	if spec.ReportEntries and #spec.ReportEntries > 0 then
+		table.insert(output, style.clear .. "\n" .. style.gray .. "Report Entries:")
+		local entry_lines = format_report_entries(spec.ReportEntries)
+		for _, line in ipairs(entry_lines) do
+			table.insert(output, line)
 		end
 	end
 
