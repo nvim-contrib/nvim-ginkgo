@@ -72,6 +72,101 @@ local function format_report_entries(entries)
 	return lines
 end
 
+---Format progress reports for output
+---@param reports table[] Array of progress reports
+---@return string[] Array of formatted lines
+local function format_progress_reports(reports)
+	local lines = {}
+	for i, report in ipairs(reports) do
+		local header = style.yellow .. "  [Progress " .. i .. "]"
+		if report.Time and report.Time ~= "" then
+			local time_part = report.Time:match("T([%d:]+)")
+			if time_part then
+				header = header .. style.gray .. " at " .. time_part
+			end
+		end
+		table.insert(lines, header)
+
+		-- show message if available
+		if report.Message and report.Message ~= "" then
+			table.insert(lines, style.clear .. utils.format_output(report.Message))
+		end
+
+		-- show current node information
+		if report.CurrentNodeType and report.CurrentNodeType ~= "" then
+			local node_info = "    In " .. report.CurrentNodeType
+			if report.CurrentNodeText and report.CurrentNodeText ~= "" then
+				node_info = node_info .. ": " .. report.CurrentNodeText
+			end
+			table.insert(lines, style.gray .. node_info)
+		end
+
+		-- show goroutines of interest (simplified)
+		if report.GoroutineOfInterest and report.GoroutineOfInterest.Stack then
+			table.insert(lines, style.gray .. "    Goroutine stack:")
+			-- show first few lines of stack
+			local stack_lines = vim.split(report.GoroutineOfInterest.Stack, "\n")
+			for j = 1, math.min(4, #stack_lines) do
+				if stack_lines[j] and stack_lines[j] ~= "" then
+					table.insert(lines, style.clear .. "      " .. stack_lines[j])
+				end
+			end
+			if #stack_lines > 4 then
+				table.insert(lines, style.gray .. "      ... (" .. (#stack_lines - 4) .. " more lines)")
+			end
+		end
+	end
+	return lines
+end
+
+---Format spec events/timeline for output
+---@param events table[] Array of spec events
+---@return string[] Array of formatted lines
+local function format_spec_events(events)
+	local lines = {}
+	for _, event in ipairs(events) do
+		local event_type = event.SpecEventType or "Unknown"
+		local time_part = ""
+		if event.TimelineLocation and event.TimelineLocation.Time then
+			local t = event.TimelineLocation.Time:match("T([%d:]+)")
+			if t then
+				time_part = style.gray .. " [" .. t .. "]"
+			end
+		end
+
+		local event_line = style.cyan .. "  • " .. event_type .. time_part
+
+		-- add message if present
+		if event.Message and event.Message ~= "" then
+			event_line = event_line .. style.clear .. " - " .. event.Message
+		end
+
+		-- add duration for certain events
+		if event.Duration and event.Duration ~= "" then
+			event_line = event_line .. style.gray .. " (" .. event.Duration .. ")"
+		end
+
+		table.insert(lines, event_line)
+
+		-- add code location if available
+		if event.CodeLocation then
+			local loc = utils.create_location(event.CodeLocation)
+			table.insert(lines, style.gray .. "    at " .. loc)
+		end
+	end
+	return lines
+end
+
+---Format parallel process info
+---@param spec table The spec report
+---@return string|nil Formatted parallel info or nil
+local function format_parallel_info(spec)
+	if spec.ParallelProcess and spec.ParallelProcess > 0 then
+		return "process #" .. spec.ParallelProcess
+	end
+	return nil
+end
+
 ---@return string
 function utils.create_success_output(spec)
 	local output = {}
@@ -85,7 +180,14 @@ function utils.create_success_output(spec)
 
 	-- prepare the output
 	table.insert(output, info_color .. style.clear .. info_text)
-	table.insert(output, style.gray .. spec_location)
+
+	-- build location line with parallel info
+	local location_line = spec_location
+	local parallel_info = format_parallel_info(spec)
+	if parallel_info then
+		location_line = location_line .. " (" .. parallel_info .. ")"
+	end
+	table.insert(output, style.gray .. location_line)
 
 	-- include timing details
 	local timing = format_timing(spec)
@@ -110,6 +212,24 @@ function utils.create_success_output(spec)
 		table.insert(output, style.clear .. "\n" .. style.gray .. "Report Entries:")
 		local entry_lines = format_report_entries(spec.ReportEntries)
 		for _, line in ipairs(entry_lines) do
+			table.insert(output, line)
+		end
+	end
+
+	-- include progress reports (for long-running tests)
+	if spec.ProgressReports and #spec.ProgressReports > 0 then
+		table.insert(output, style.clear .. "\n" .. style.gray .. "Progress Reports:")
+		local progress_lines = format_progress_reports(spec.ProgressReports)
+		for _, line in ipairs(progress_lines) do
+			table.insert(output, line)
+		end
+	end
+
+	-- include spec events/timeline
+	if spec.SpecEvents and #spec.SpecEvents > 0 then
+		table.insert(output, style.clear .. "\n" .. style.gray .. "Timeline:")
+		local event_lines = format_spec_events(spec.SpecEvents)
+		for _, line in ipairs(event_lines) do
 			table.insert(output, line)
 		end
 	end
@@ -169,7 +289,13 @@ function utils.create_error_output(spec)
 	local failure_message = failure.Message and utils.format_output(failure.Message) or "No message"
 	local failure_location = failure.Location and utils.create_location(failure.Location) or "unknown"
 
-	table.insert(output, style.gray .. failure_location .. "\n")
+	-- build location line with parallel info
+	local location_line = failure_location
+	local parallel_info = format_parallel_info(spec)
+	if parallel_info then
+		location_line = location_line .. " (" .. parallel_info .. ")"
+	end
+	table.insert(output, style.gray .. location_line .. "\n")
 	table.insert(output, info_color .. "  " .. failure_status .. " " .. failure_message)
 	table.insert(output, style.bold .. "  " .. "In " .. failure_node_type .. " at " .. failure_node_location)
 
@@ -219,6 +345,24 @@ function utils.create_error_output(spec)
 		table.insert(output, style.clear .. "\n" .. style.gray .. "Report Entries:")
 		local entry_lines = format_report_entries(spec.ReportEntries)
 		for _, line in ipairs(entry_lines) do
+			table.insert(output, line)
+		end
+	end
+
+	-- include progress reports (for long-running tests)
+	if spec.ProgressReports and #spec.ProgressReports > 0 then
+		table.insert(output, style.clear .. "\n" .. style.gray .. "Progress Reports:")
+		local progress_lines = format_progress_reports(spec.ProgressReports)
+		for _, line in ipairs(progress_lines) do
+			table.insert(output, line)
+		end
+	end
+
+	-- include spec events/timeline
+	if spec.SpecEvents and #spec.SpecEvents > 0 then
+		table.insert(output, style.clear .. "\n" .. style.gray .. "Timeline:")
+		local event_lines = format_spec_events(spec.SpecEvents)
+		for _, line in ipairs(event_lines) do
 			table.insert(output, line)
 		end
 	end
