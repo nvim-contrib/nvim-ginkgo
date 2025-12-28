@@ -308,7 +308,19 @@ function adapter.results(spec, result, tree)
 		return {}
 	end
 
-	for _, suite_item in pairs(report) do
+	-- map Ginkgo states to valid neotest states
+	local state_map = {
+		pending = "skipped",
+		panicked = "failed",
+		skipped = "skipped",
+		passed = "passed",
+		failed = "failed",
+		interrupted = "failed",
+		aborted = "failed",
+		timedout = "failed",
+	}
+
+	for _, suite_item in ipairs(report) do
 		-- track suite-level results
 		local suite_item_node = {}
 		local suite_item_node_id = suite_item.SuitePath
@@ -323,7 +335,7 @@ function adapter.results(spec, result, tree)
 		local passed = 0
 		local failed = 0
 		local skipped = 0
-		for _, spec_item in pairs(suite_item.SpecReports or {}) do
+		for _, spec_item in ipairs(suite_item.SpecReports or {}) do
 			if spec_item.State == "passed" then
 				passed = passed + 1
 			elseif spec_item.State == "failed" or spec_item.State == "panicked" then
@@ -338,27 +350,28 @@ function adapter.results(spec, result, tree)
 		-- leaf node types that represent test cases
 		local test_leaf_types = { It = true, Specify = true, Entry = true }
 
-		for _, spec_item in pairs(suite_item.SpecReports or {}) do
+		for _, spec_item in ipairs(suite_item.SpecReports or {}) do
 			if test_leaf_types[spec_item.LeafNodeType] then
 				local spec_item_node = {}
 				local spec_item_node_id = utils.create_location_id(spec_item)
 
-				if spec_item.State == "pending" then
-					spec_item_node.status = "skipped"
-				elseif spec_item.State == "panicked" then
-					spec_item_node.status = "failed"
-				elseif spec_item.State == "skipped" then
-					goto continue
-				else
-					spec_item_node.status = spec_item.State
-				end
+				-- map state to valid neotest status
+				spec_item_node.status = state_map[spec_item.State] or "failed"
 
 				-- color definition
 				local spec_item_color = utils.get_color(spec_item)
 				-- set the node short attribute
 				spec_item_node.short = utils.create_desc(spec_item, spec_item_color)
-				-- set the node location
-				spec_item_node.location = spec_item.LeafNodeLocation.LineNumber
+
+				-- add test duration if available
+				if spec_item.RunTime then
+					spec_item_node.short = spec_item_node.short .. " (" .. spec_item.RunTime .. ")"
+				end
+
+				-- set the node location (with nil check)
+				if spec_item.LeafNodeLocation and spec_item.LeafNodeLocation.LineNumber then
+					spec_item_node.location = spec_item.LeafNodeLocation.LineNumber
+				end
 
 				-- set the node errors
 				if spec_item.Failure then
@@ -372,18 +385,24 @@ function adapter.results(spec, result, tree)
 					-- set the node output
 					spec_item_node.output = async.fn.tempname()
 					table.insert(temp_files, spec_item_node.output)
-					-- write the output
-					lib.files.write(spec_item_node.output, err_output)
+					-- write the output with error handling
+					local wok, werr = pcall(lib.files.write, spec_item_node.output, err_output)
+					if not wok then
+						logger.warn("Failed to write error output: " .. tostring(werr))
+					end
 					-- set the node short attribute
 					spec_item_node.short = spec_item_node.short .. ": " .. err.message
-				elseif spec_item.CapturedGinkgoWriterOutput then
-					-- prepare the output
+				elseif spec_item.CapturedGinkgoWriterOutput or spec_item.CapturedStdOutErr then
+					-- prepare the output (now also triggers for stdout/stderr)
 					local spec_output = utils.create_success_output(spec_item)
 					-- set the node output
 					spec_item_node.output = async.fn.tempname()
 					table.insert(temp_files, spec_item_node.output)
-					-- write the output
-					lib.files.write(spec_item_node.output, spec_output)
+					-- write the output with error handling
+					local wok, werr = pcall(lib.files.write, spec_item_node.output, spec_output)
+					if not wok then
+						logger.warn("Failed to write success output: " .. tostring(werr))
+					end
 				else
 					spec_item_node.short = nil
 				end
@@ -391,8 +410,6 @@ function adapter.results(spec, result, tree)
 				-- set the node
 				collection[spec_item_node_id] = spec_item_node
 			end
-
-			::continue::
 		end
 	end
 

@@ -10,16 +10,23 @@ function utils.create_success_output(spec)
 	local info_text = utils.create_desc(spec, info_color)
 
 	-- prepare the info
-	local info = {
-		spec_location = utils.create_location(spec.LeafNodeLocation),
-	}
+	local spec_location = spec.LeafNodeLocation
+		and utils.create_location(spec.LeafNodeLocation) or "unknown"
 
 	-- prepare the output
 	table.insert(output, info_color .. style.clear .. info_text)
-	table.insert(output, style.gray .. info.spec_location)
+	table.insert(output, style.gray .. spec_location)
 
-	if spec.CapturedGinkgoWriterOutput then
+	-- include GinkgoWriter output
+	if spec.CapturedGinkgoWriterOutput and spec.CapturedGinkgoWriterOutput ~= "" then
+		table.insert(output, style.clear .. "\n" .. style.gray .. "GinkgoWriter output:")
 		table.insert(output, style.clear .. utils.format_output(spec.CapturedGinkgoWriterOutput))
+	end
+
+	-- include stdout/stderr
+	if spec.CapturedStdOutErr and spec.CapturedStdOutErr ~= "" then
+		table.insert(output, style.clear .. "\n" .. style.gray .. "stdout/stderr:")
+		table.insert(output, style.clear .. utils.format_output(spec.CapturedStdOutErr))
 	end
 
 	-- done
@@ -29,13 +36,24 @@ end
 ---@return table
 function utils.create_error(spec)
 	local failure = spec.Failure
+	if not failure then
+		return { line = 0, message = "Unknown error" }
+	end
 
 	local err = {
-		line = failure.FailureNodeLocation.LineNumber - 1,
-		message = failure.Message,
+		line = 0,
+		message = failure.Message or "Test failed",
 	}
 
-	if failure.Location.FileName == failure.FailureNodeLocation.FileName then
+	-- safely get line number from failure location
+	if failure.FailureNodeLocation and failure.FailureNodeLocation.LineNumber then
+		err.line = failure.FailureNodeLocation.LineNumber - 1
+	end
+
+	-- prefer Location line number if same file
+	if failure.Location and failure.FailureNodeLocation
+		and failure.Location.FileName == failure.FailureNodeLocation.FileName
+		and failure.Location.LineNumber then
 		err.line = failure.Location.LineNumber - 1
 	end
 
@@ -48,31 +66,49 @@ function utils.create_error_output(spec)
 	local info_text = utils.create_desc(spec, info_color)
 
 	local failure = spec.Failure
-	-- prepare the info
-	local info = {
-		failure_status = "[" .. string.upper(spec.State) .. "]",
-		failure_node_type = "[" .. failure.FailureNodeType .. "]",
-		failure_node_location = utils.create_location(failure.FailureNodeLocation),
-		failure_message = utils.format_output(failure.Message),
-		failure_location = utils.create_location(failure.Location),
-		failure_stack_trace = failure.Location.FullStackTrace,
-	}
-
 	local output = {}
-	-- prepare the output
-	table.insert(output, info_color .. style.clear .. info_text)
-	table.insert(output, style.gray .. info.failure_location .. "\n")
-	table.insert(output, info_color .. "  " .. info.failure_status .. " " .. info.failure_message)
-	table.insert(output, style.bold .. "  " .. "In " .. info.failure_node_type .. " at " .. info.failure_node_location)
 
-	if spec.CapturedGinkgoWriterOutput then
+	-- prepare the output header
+	table.insert(output, info_color .. style.clear .. info_text)
+
+	if not failure then
+		table.insert(output, style.red .. "  [ERROR] No failure details available")
+		return table.concat(output, "\n") .. "\n"
+	end
+
+	-- safely build info with nil checks
+	local failure_status = "[" .. string.upper(spec.State or "UNKNOWN") .. "]"
+	local failure_node_type = failure.FailureNodeType and ("[" .. failure.FailureNodeType .. "]") or "[UNKNOWN]"
+	local failure_node_location = failure.FailureNodeLocation
+		and utils.create_location(failure.FailureNodeLocation) or "unknown"
+	local failure_message = failure.Message and utils.format_output(failure.Message) or "No message"
+	local failure_location = failure.Location and utils.create_location(failure.Location) or "unknown"
+
+	table.insert(output, style.gray .. failure_location .. "\n")
+	table.insert(output, info_color .. "  " .. failure_status .. " " .. failure_message)
+	table.insert(output, style.bold .. "  " .. "In " .. failure_node_type .. " at " .. failure_node_location)
+
+	-- include GinkgoWriter output
+	if spec.CapturedGinkgoWriterOutput and spec.CapturedGinkgoWriterOutput ~= "" then
+		table.insert(output, style.clear .. "\n" .. style.gray .. "GinkgoWriter output:")
 		table.insert(output, style.clear .. utils.format_output(spec.CapturedGinkgoWriterOutput))
 	end
 
+	-- include stdout/stderr
+	if spec.CapturedStdOutErr and spec.CapturedStdOutErr ~= "" then
+		table.insert(output, style.clear .. "\n" .. style.gray .. "stdout/stderr:")
+		table.insert(output, style.clear .. utils.format_output(spec.CapturedStdOutErr))
+	end
+
+	-- include panic info and stack trace
 	if spec.State == "panicked" then
-		table.insert(output, style.clear .. info_color .. failure.ForwardedPanic)
-		table.insert(output, style.clear .. info_color .. "Full Stack Trace")
-		table.insert(output, style.clear .. info.failure_stack_trace)
+		if failure.ForwardedPanic then
+			table.insert(output, style.clear .. "\n" .. info_color .. failure.ForwardedPanic)
+		end
+		if failure.Location and failure.Location.FullStackTrace then
+			table.insert(output, style.clear .. info_color .. "Full Stack Trace")
+			table.insert(output, style.clear .. failure.Location.FullStackTrace)
+		end
 	end
 
 	-- done
