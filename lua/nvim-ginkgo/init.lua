@@ -4,7 +4,6 @@ local async = require("neotest.async")
 local logger = require("neotest.logging")
 local utils = require("nvim-ginkgo.utils")
 local report = require("nvim-ginkgo.report")
-local watch = require("nvim-ginkgo.watch")
 
 ---@class nvim-ginkgo.Config
 ---@field args? string[] Extra arguments to pass to ginkgo
@@ -420,17 +419,12 @@ end
 local function setup(opts)
 	opts = opts or {}
 	config = vim.tbl_deep_extend("force", default_config, opts)
-
-	-- configure watch module with ginkgo_cmd
-	watch.default_cmd = config.ginkgo_cmd
-
 	return adapter
 end
 
--- Export both the setup function and additional utilities
+-- Export the setup function
 return setmetatable({
 	setup = setup,
-	watch = watch,
 }, {
 	-- Allow calling the module directly as a function for backwards compatibility
 	__call = function(_, opts)

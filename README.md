@@ -108,7 +108,6 @@ require("neotest").setup({
 - Suite-level result summaries
 - Automatic cleanup of temporary files
 - Debug tests with DAP (delve)
-- Watch mode for continuous testing
 - Coverage collection
 
 ## Debugging Tests
@@ -128,61 +127,6 @@ Or set up a keybinding:
 vim.keymap.set("n", "<leader>td", function()
   require("neotest").run.run({ strategy = "dap" })
 end, { desc = "Debug nearest test" })
-```
-
-## Watch Mode
-
-nvim-ginkgo includes a watch mode that runs `ginkgo watch` in a terminal buffer.
-
-### Basic Usage
-
-```lua
-local ginkgo = require("nvim-ginkgo")
-
--- Start watching a directory
-ginkgo.watch.start("/path/to/your/package")
-
--- Start with options
-ginkgo.watch.start("/path/to/your/package", {
-  focus_file = "foo_test.go",           -- Focus on specific file
-  focus_pattern = "should do something", -- Focus on specific test
-  args = { "--fail-fast" },              -- Extra ginkgo args
-  notify = true,                         -- Show notifications (default: true)
-})
-
--- Stop watching
-ginkgo.watch.stop("/path/to/your/package")
-
--- Stop all watches
-ginkgo.watch.stop_all()
-
--- Toggle watch mode
-ginkgo.watch.toggle("/path/to/your/package")
-
--- Check if watching
-if ginkgo.watch.is_watching("/path/to/your/package") then
-  -- ...
-end
-
--- Get all active watches
-local dirs = ginkgo.watch.get_active_watches()
-```
-
-### Example Keybindings
-
-```lua
-local ginkgo = require("nvim-ginkgo")
-
--- Toggle watch for current file's directory
-vim.keymap.set("n", "<leader>tw", function()
-  local dir = vim.fn.expand("%:p:h")
-  ginkgo.watch.toggle(dir)
-end, { desc = "Toggle Ginkgo watch" })
-
--- Stop all watches
-vim.keymap.set("n", "<leader>tW", function()
-  ginkgo.watch.stop_all()
-end, { desc = "Stop all Ginkgo watches" })
 ```
 
 ## Coverage
