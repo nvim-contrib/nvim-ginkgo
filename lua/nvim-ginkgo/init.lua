@@ -368,6 +368,11 @@ function adapter.results(spec, result, tree)
 					spec_item_node.short = spec_item_node.short .. " (" .. spec_item.RunTime .. ")"
 				end
 
+				-- detect flaky tests (tests that required multiple attempts to pass)
+				if spec_item.NumAttempts and spec_item.NumAttempts > 1 then
+					spec_item_node.short = "[FLAKEY - " .. spec_item.NumAttempts .. " ATTEMPTS] " .. spec_item_node.short
+				end
+
 				-- set the node location (with nil check)
 				if spec_item.LeafNodeLocation and spec_item.LeafNodeLocation.LineNumber then
 					spec_item_node.location = spec_item.LeafNodeLocation.LineNumber

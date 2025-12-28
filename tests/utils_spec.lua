@@ -90,6 +90,27 @@ package main
 			assert.is_not_nil(result)
 			assert.is_true(result:find("10m") ~= nil) -- green ANSI code
 		end)
+
+		it("returns orange for timedout state", function()
+			local spec = { State = "timedout" }
+			local result = utils.get_color(spec)
+			assert.is_not_nil(result)
+			assert.is_true(result:find("214m") ~= nil) -- orange ANSI code
+		end)
+
+		it("returns orange for interrupted state", function()
+			local spec = { State = "interrupted" }
+			local result = utils.get_color(spec)
+			assert.is_not_nil(result)
+			assert.is_true(result:find("214m") ~= nil) -- orange ANSI code
+		end)
+
+		it("returns coral for aborted state", function()
+			local spec = { State = "aborted" }
+			local result = utils.get_color(spec)
+			assert.is_not_nil(result)
+			assert.is_true(result:find("204m") ~= nil) -- coral ANSI code
+		end)
 	end)
 
 	describe("create_position_focus", function()

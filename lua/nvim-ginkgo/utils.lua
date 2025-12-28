@@ -111,6 +111,18 @@ function utils.create_error_output(spec)
 		end
 	end
 
+	-- include additional failures (e.g., AfterEach failures)
+	if spec.AdditionalFailures and #spec.AdditionalFailures > 0 then
+		table.insert(output, style.clear .. "\n" .. style.orange .. "Additional Failures:")
+		for i, addl_failure in ipairs(spec.AdditionalFailures) do
+			local addl_loc = addl_failure.Location and utils.create_location(addl_failure.Location) or "unknown"
+			local addl_msg = addl_failure.Message and utils.format_output(addl_failure.Message) or "No message"
+			local addl_node_type = addl_failure.FailureNodeType or "UNKNOWN"
+			table.insert(output, style.red .. "  [" .. i .. "] " .. addl_node_type .. " at " .. addl_loc)
+			table.insert(output, style.clear .. "      " .. addl_msg)
+		end
+	end
+
 	-- done
 	return table.concat(output, "\n") .. "\n"
 end
@@ -144,7 +156,9 @@ function utils.get_build_tags(file_path)
 	if not tag_style then
 		return ""
 	end
-	local tags = vim.split(line:gsub(tag_style, ""), " ")
+	-- escape Lua pattern metacharacters for gsub (+ is special)
+	local escaped_style = vim.pesc(tag_style)
+	local tags = vim.split(line:gsub(escaped_style, ""), " ")
 	if #tags < 1 then
 		return ""
 	end
@@ -153,13 +167,17 @@ end
 
 ---@return string
 function utils.get_color(spec)
-	-- check state first as it takes precedence
+	-- check state first as it takes precedence (matches Ginkgo's default reporter colors)
 	if spec.State == "pending" then
 		return style.yellow
 	elseif spec.State == "panicked" then
 		return style.magenta
 	elseif spec.State == "skipped" then
 		return style.cyan
+	elseif spec.State == "timedout" or spec.State == "interrupted" then
+		return style.orange
+	elseif spec.State == "aborted" then
+		return style.coral
 	elseif spec.Failure then
 		return style.red
 	else
@@ -185,6 +203,12 @@ function utils.create_desc(spec, color)
 
 	local spec_desc = table.concat(spec_desc_texts, " ")
 	local spec_name = "[" .. spec.LeafNodeType .. "] " .. spec.LeafNodeText
+
+	-- add labels if present
+	if spec.LeafNodeLabels and #spec.LeafNodeLabels > 0 then
+		spec_name = spec_name .. " [" .. table.concat(spec.LeafNodeLabels, ", ") .. "]"
+	end
+
 	-- done
 	return spec_desc .. " " .. color .. spec_name
 end
