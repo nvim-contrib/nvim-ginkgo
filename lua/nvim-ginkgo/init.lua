@@ -3,6 +3,7 @@ local plenary = require("plenary.path")
 local async = require("neotest.async")
 local logger = require("neotest.logging")
 local utils = require("nvim-ginkgo.utils")
+local watch = require("nvim-ginkgo.watch")
 
 ---@class nvim-ginkgo.Config
 ---@field args? string[] Extra arguments to pass to ginkgo
@@ -11,6 +12,15 @@ local utils = require("nvim-ginkgo.utils")
 ---@field label_filter? string Ginkgo v2 label filter expression
 ---@field timeout? string Test timeout (e.g., "60s", "5m")
 ---@field ginkgo_cmd? string Path to ginkgo binary (default: "ginkgo")
+---@field cover? boolean Enable coverage collection (--cover)
+---@field coverprofile? string Coverage profile output file (--coverprofile)
+---@field covermode? string Coverage mode: set, count, or atomic (--covermode)
+---@field dap? nvim-ginkgo.DapConfig DAP configuration for debugging
+
+---@class nvim-ginkgo.DapConfig
+---@field adapter? string DAP adapter name (default: "go")
+---@field port? number Port for delve to listen on (default: 40000)
+---@field build_flags? string[] Extra flags for go test -c
 
 ---@type nvim-ginkgo.Config
 local default_config = {
@@ -20,6 +30,14 @@ local default_config = {
 	label_filter = nil,
 	timeout = nil,
 	ginkgo_cmd = "ginkgo",
+	cover = false,
+	coverprofile = nil,
+	covermode = nil,
+	dap = {
+		adapter = "go",
+		port = 40000,
+		build_flags = {},
+	},
 }
 
 ---@type nvim-ginkgo.Config
@@ -97,9 +115,68 @@ function adapter.discover_positions(file_path)
 	return lib.treesitter.parse_positions(file_path, query, options)
 end
 
+---Build DAP configuration for debugging tests
+---@param position table The test position data
+---@param directory string The test directory
+---@return table DAP configuration
+local function build_dap_config(position, directory)
+	local dap_config = config.dap or {}
+	local focus_args = {}
+
+	-- add focus pattern for specific test/namespace
+	if position.type == "test" or position.type == "namespace" then
+		local focus_pattern = utils.create_position_focus(position)
+		-- remove surrounding quotes for delve args
+		focus_pattern = focus_pattern:gsub("^'", ""):gsub("'$", "")
+		table.insert(focus_args, "--ginkgo.focus=" .. focus_pattern)
+	end
+
+	-- add focus file
+	if position.type ~= "dir" then
+		local focus_file = position.path
+		if position.type == "test" or position.type == "namespace" then
+			local line_number = position.range[1] + 1
+			focus_file = position.path .. ":" .. line_number
+		end
+		table.insert(focus_args, "--ginkgo.focus-file=" .. focus_file)
+	end
+
+	-- add verbose flag
+	table.insert(focus_args, "--ginkgo.v")
+
+	return {
+		type = dap_config.adapter or "go",
+		name = "Debug Ginkgo Test",
+		request = "launch",
+		mode = "test",
+		program = directory,
+		args = focus_args,
+		buildFlags = dap_config.build_flags or {},
+	}
+end
+
 ---@param args neotest.RunArgs
 ---@return nil | neotest.RunSpec | neotest.RunSpec[]
 function adapter.build_spec(args)
+	local position = args.tree:data()
+	local directory = position.path
+
+	-- determine the test directory
+	if vim.fn.isdirectory(position.path) ~= 1 then
+		directory = vim.fn.fnamemodify(position.path, ":h")
+	end
+
+	-- check if DAP strategy is requested
+	if args.strategy == "dap" then
+		return {
+			strategy = build_dap_config(position, directory),
+			context = {
+				report_input_type = position.type,
+				report_input_path = position.path,
+			},
+		}
+	end
+
 	local report_path = async.fn.tempname()
 	local report_filename = vim.fn.fnamemodify(report_path, ":t")
 	local report_directory = vim.fn.fnamemodify(report_path, ":h")
@@ -134,24 +211,33 @@ function adapter.build_spec(args)
 		table.insert(cargs, config.label_filter)
 	end
 
+	-- add coverage options
+	if config.cover then
+		table.insert(cargs, "--cover")
+	end
+	if config.coverprofile then
+		table.insert(cargs, "--coverprofile")
+		table.insert(cargs, config.coverprofile)
+	end
+	if config.covermode then
+		table.insert(cargs, "--covermode")
+		table.insert(cargs, config.covermode)
+	end
+
 	-- add user-configured extra args
 	for _, arg in ipairs(config.args) do
 		table.insert(cargs, arg)
 	end
 
-	local position = args.tree:data()
-
 	-- add build tags if present in the test file
-	local test_file_path = position.path
-	if vim.fn.isdirectory(test_file_path) ~= 1 then
-		local build_tags = utils.get_build_tags(test_file_path)
+	if vim.fn.isdirectory(position.path) ~= 1 then
+		local build_tags = utils.get_build_tags(position.path)
 		if build_tags ~= "" then
 			table.insert(cargs, build_tags)
 		end
 	end
 
-	local directory = position.path
-	-- The path for the position is not a directory, ensure the directory variable refers to one
+	-- add focus options for specific tests/namespaces
 	if vim.fn.isdirectory(position.path) ~= 1 then
 		local focus_file_path = position.path
 		-- prepare the focus path
@@ -323,8 +409,23 @@ end
 ---Setup the adapter with user configuration
 ---@param opts? nvim-ginkgo.Config
 ---@return neotest.Adapter
-return function(opts)
+local function setup(opts)
 	opts = opts or {}
 	config = vim.tbl_deep_extend("force", default_config, opts)
+
+	-- configure watch module with ginkgo_cmd
+	watch.default_cmd = config.ginkgo_cmd
+
 	return adapter
 end
+
+-- Export both the setup function and additional utilities
+return setmetatable({
+	setup = setup,
+	watch = watch,
+}, {
+	-- Allow calling the module directly as a function for backwards compatibility
+	__call = function(_, opts)
+		return setup(opts)
+	end,
+})

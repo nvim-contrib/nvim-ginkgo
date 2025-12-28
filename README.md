@@ -9,6 +9,7 @@ A [Neotest](https://github.com/nvim-neotest/neotest) adapter for the
 - [neotest](https://github.com/nvim-neotest/neotest)
 - [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
 - [Ginkgo CLI](https://github.com/onsi/ginkgo) v2
+- (Optional) [nvim-dap](https://github.com/mfussenegger/nvim-dap) and [nvim-dap-go](https://github.com/leoluz/nvim-dap-go) for debugging
 
 Install Ginkgo CLI:
 
@@ -65,6 +66,18 @@ require("neotest").setup({
 
       -- Path to ginkgo binary (default: "ginkgo")
       ginkgo_cmd = "/custom/path/ginkgo",
+
+      -- Coverage options
+      cover = true,                    -- Enable coverage (default: false)
+      coverprofile = "coverage.out",   -- Coverage output file (default: nil)
+      covermode = "atomic",            -- Coverage mode: set, count, atomic (default: nil)
+
+      -- DAP (Debug Adapter Protocol) configuration
+      dap = {
+        adapter = "go",        -- DAP adapter name (default: "go")
+        port = 40000,          -- Delve port (default: 40000)
+        build_flags = {},      -- Extra build flags for go test -c
+      },
     }),
   },
 })
@@ -80,6 +93,10 @@ require("neotest").setup({
 | `label_filter` | `string` | `nil` | Ginkgo v2 label filter expression |
 | `timeout` | `string` | `nil` | Test timeout (e.g., "60s", "5m") |
 | `ginkgo_cmd` | `string` | `"ginkgo"` | Path to ginkgo binary |
+| `cover` | `boolean` | `false` | Enable coverage collection |
+| `coverprofile` | `string` | `nil` | Coverage profile output file |
+| `covermode` | `string` | `nil` | Coverage mode: set, count, or atomic |
+| `dap` | `table` | see above | DAP configuration for debugging |
 
 ## Features
 
@@ -90,6 +107,103 @@ require("neotest").setup({
 - Detailed test output with color-coded results
 - Suite-level result summaries
 - Automatic cleanup of temporary files
+- Debug tests with DAP (delve)
+- Watch mode for continuous testing
+- Coverage collection
+
+## Debugging Tests
+
+To debug tests, you need [nvim-dap](https://github.com/mfussenegger/nvim-dap) and
+[nvim-dap-go](https://github.com/leoluz/nvim-dap-go) configured.
+
+Run tests with the `dap` strategy:
+
+```lua
+require("neotest").run.run({ strategy = "dap" })
+```
+
+Or set up a keybinding:
+
+```lua
+vim.keymap.set("n", "<leader>td", function()
+  require("neotest").run.run({ strategy = "dap" })
+end, { desc = "Debug nearest test" })
+```
+
+## Watch Mode
+
+nvim-ginkgo includes a watch mode that runs `ginkgo watch` in a terminal buffer.
+
+### Basic Usage
+
+```lua
+local ginkgo = require("nvim-ginkgo")
+
+-- Start watching a directory
+ginkgo.watch.start("/path/to/your/package")
+
+-- Start with options
+ginkgo.watch.start("/path/to/your/package", {
+  focus_file = "foo_test.go",           -- Focus on specific file
+  focus_pattern = "should do something", -- Focus on specific test
+  args = { "--fail-fast" },              -- Extra ginkgo args
+  notify = true,                         -- Show notifications (default: true)
+})
+
+-- Stop watching
+ginkgo.watch.stop("/path/to/your/package")
+
+-- Stop all watches
+ginkgo.watch.stop_all()
+
+-- Toggle watch mode
+ginkgo.watch.toggle("/path/to/your/package")
+
+-- Check if watching
+if ginkgo.watch.is_watching("/path/to/your/package") then
+  -- ...
+end
+
+-- Get all active watches
+local dirs = ginkgo.watch.get_active_watches()
+```
+
+### Example Keybindings
+
+```lua
+local ginkgo = require("nvim-ginkgo")
+
+-- Toggle watch for current file's directory
+vim.keymap.set("n", "<leader>tw", function()
+  local dir = vim.fn.expand("%:p:h")
+  ginkgo.watch.toggle(dir)
+end, { desc = "Toggle Ginkgo watch" })
+
+-- Stop all watches
+vim.keymap.set("n", "<leader>tW", function()
+  ginkgo.watch.stop_all()
+end, { desc = "Stop all Ginkgo watches" })
+```
+
+## Coverage
+
+Enable coverage collection in your config:
+
+```lua
+require("nvim-ginkgo")({
+  cover = true,
+  coverprofile = "coverage.out",
+  covermode = "atomic",
+})
+```
+
+After running tests, view coverage with Go tools:
+
+```bash
+go tool cover -html=coverage.out
+```
+
+Or integrate with [nvim-coverage](https://github.com/andythigpen/nvim-coverage) for in-editor display.
 
 ## Running Tests
 
