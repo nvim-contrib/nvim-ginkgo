@@ -368,6 +368,39 @@ function M.create_error(spec)
 	return err
 end
 
+---Create minimal output for a spec (when no captured output)
+---@param spec table The spec report
+---@return string
+function M.create_minimal_output(spec)
+	local output = {}
+
+	local info_color = M.get_color(spec)
+	local info_text = M.create_desc(spec, info_color)
+
+	-- prepare location
+	local spec_location = spec.LeafNodeLocation and M.create_location(spec.LeafNodeLocation) or "unknown"
+
+	-- prepare the output
+	table.insert(output, info_color .. style.clear .. info_text)
+
+	-- build location line with parallel info
+	local location_line = spec_location
+	local parallel_info = format_parallel_info(spec)
+	if parallel_info then
+		location_line = location_line .. " (" .. parallel_info .. ")"
+	end
+	table.insert(output, style.gray .. location_line)
+
+	-- add status and duration
+	local status_line = style.green .. "  [" .. string.upper(spec.State or "PASSED") .. "]"
+	if spec.RunTime then
+		status_line = status_line .. style.gray .. " " .. spec.RunTime
+	end
+	table.insert(output, status_line)
+
+	return table.concat(output, "\n") .. "\n"
+end
+
 ---Create error output for a spec
 ---@param spec table The spec report
 ---@return string

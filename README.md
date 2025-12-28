@@ -11,7 +11,18 @@ A [Neotest](https://github.com/nvim-neotest/neotest) adapter for the
 - [Ginkgo CLI](https://github.com/onsi/ginkgo) v2
 - (Optional) [nvim-dap](https://github.com/mfussenegger/nvim-dap) and [nvim-dap-go](https://github.com/leoluz/nvim-dap-go) for debugging
 
-Install Ginkgo CLI:
+### Ginkgo CLI
+
+The plugin automatically tries `go tool ginkgo` first (requires Go 1.24+ with ginkgo in go.mod),
+then falls back to the globally installed `ginkgo` command.
+
+**Option 1: Add to go.mod (recommended)**
+
+```bash
+go get github.com/onsi/ginkgo/v2/ginkgo
+```
+
+**Option 2: Install globally**
 
 ```bash
 go install github.com/onsi/ginkgo/v2/ginkgo@latest
@@ -64,7 +75,7 @@ require("neotest").setup({
       -- Test timeout (default: nil, uses ginkgo default)
       timeout = "5m",
 
-      -- Path to ginkgo binary (default: "ginkgo")
+      -- Fallback ginkgo binary (plugin tries "go tool ginkgo" first)
       ginkgo_cmd = "/custom/path/ginkgo",
 
       -- Coverage options
@@ -92,7 +103,7 @@ require("neotest").setup({
 | `race` | `boolean` | `false` | Enable Go race detector (`--race`) |
 | `label_filter` | `string` | `nil` | Ginkgo v2 label filter expression |
 | `timeout` | `string` | `nil` | Test timeout (e.g., "60s", "5m") |
-| `ginkgo_cmd` | `string` | `"ginkgo"` | Path to ginkgo binary |
+| `ginkgo_cmd` | `string` | `"ginkgo"` | Fallback ginkgo binary (plugin tries `go tool ginkgo` first) |
 | `cover` | `boolean` | `false` | Enable coverage collection |
 | `coverprofile` | `string` | `nil` | Coverage profile output file |
 | `covermode` | `string` | `nil` | Coverage mode: set, count, or atomic |

@@ -46,6 +46,23 @@ local config = vim.deepcopy(default_config)
 ---@type neotest.Adapter
 local adapter = { name = "nvim-ginkgo" }
 
+---Get the ginkgo command to use
+---Tries "go tool ginkgo" first, falls back to configured ginkgo_cmd
+---@return string[] Command parts
+local function get_ginkgo_command()
+	-- Try "go tool ginkgo" first (works if ginkgo is in go.mod)
+	local handle = io.popen("go tool ginkgo version 2>/dev/null")
+	if handle then
+		local result = handle:read("*a")
+		handle:close()
+		if result and result ~= "" then
+			return { "go", "tool", "ginkgo" }
+		end
+	end
+	-- Fall back to configured ginkgo_cmd
+	return { config.ginkgo_cmd }
+end
+
 ---Find the project root directory given a current directory to work from.
 ---Should no root be found, the adapter can still be used in a non-project context if a test file matches.
 ---@async
@@ -126,15 +143,14 @@ local function build_dap_config(position, directory)
 	-- add focus pattern for specific test/namespace
 	if position.type == "test" or position.type == "namespace" then
 		local focus_pattern = utils.create_position_focus(position)
-		-- remove surrounding quotes for delve args
-		focus_pattern = focus_pattern:gsub("^'", ""):gsub("'$", "")
 		table.insert(focus_args, "--ginkgo.focus=" .. focus_pattern)
 	end
 
 	-- add focus file
 	if position.type ~= "dir" then
 		local focus_file = position.path
-		if position.type == "test" or position.type == "namespace" then
+		-- only add line number for individual tests, not namespaces
+		if position.type == "test" then
 			local line_number = position.range[1] + 1
 			focus_file = position.path .. ":" .. line_number
 		end
@@ -182,8 +198,8 @@ function adapter.build_spec(args)
 	local report_directory = vim.fn.fnamemodify(report_path, ":h")
 
 	-- build command as a table for proper argument handling
-	local cargs = {
-		config.ginkgo_cmd,
+	local ginkgo_cmd = get_ginkgo_command()
+	local cargs = vim.list_extend(vim.deepcopy(ginkgo_cmd), {
 		"run",
 		"-v",
 		"--keep-going",
@@ -192,7 +208,7 @@ function adapter.build_spec(args)
 		"--json-report",
 		report_filename,
 		"--silence-skips",
-	}
+	})
 
 	-- add race detection if enabled
 	if config.race then
@@ -241,13 +257,18 @@ function adapter.build_spec(args)
 	if vim.fn.isdirectory(position.path) ~= 1 then
 		local focus_file_path = position.path
 		-- prepare the focus path
-		if position.type == "test" or position.type == "namespace" then
+		if position.type == "test" then
+			-- for individual tests, use line number to target exact spec
 			local line_number = position.range[1] + 1
-			-- replace the focus_file_path with its line number
 			focus_file_path = position.path .. ":" .. line_number
 			-- create the focus pattern
 			local focus_pattern = utils.create_position_focus(position)
-			-- prepare the arguments
+			table.insert(cargs, "--focus")
+			table.insert(cargs, focus_pattern)
+		elseif position.type == "namespace" then
+			-- for namespaces (Describe/Context), only use focus pattern
+			-- don't add line number to focus-file as it would skip nested Its
+			local focus_pattern = utils.create_position_focus(position)
 			table.insert(cargs, "--focus")
 			table.insert(cargs, focus_pattern)
 		end
@@ -383,7 +404,7 @@ function adapter.results(spec, result, tree)
 					-- set the node short attribute
 					spec_item_node.short = spec_item_node.short .. ": " .. err.message
 				elseif spec_item.CapturedGinkgoWriterOutput or spec_item.CapturedStdOutErr then
-					-- prepare the output (now also triggers for stdout/stderr)
+					-- prepare the output (with captured stdout/stderr/GinkgoWriter)
 					local spec_output = report.create_success_output(spec_item)
 					-- set the node output
 					spec_item_node.output = async.fn.tempname()
@@ -394,6 +415,14 @@ function adapter.results(spec, result, tree)
 						logger.warn("Failed to write success output: " .. tostring(werr))
 					end
 				else
+					-- create minimal output for tests without captured content
+					local spec_output = report.create_minimal_output(spec_item)
+					spec_item_node.output = async.fn.tempname()
+					table.insert(temp_files, spec_item_node.output)
+					local wok, werr = pcall(lib.files.write, spec_item_node.output, spec_output)
+					if not wok then
+						logger.warn("Failed to write minimal output: " .. tostring(werr))
+					end
 					spec_item_node.short = nil
 				end
 
@@ -404,11 +433,12 @@ function adapter.results(spec, result, tree)
 	end
 
 	-- schedule cleanup of temporary files (after neotest has read them)
+	-- Use longer delay since users may hover over results much later
 	vim.defer_fn(function()
 		for _, temp_file in ipairs(temp_files) do
 			pcall(os.remove, temp_file)
 		end
-	end, 5000) -- 5 second delay to ensure neotest has processed results
+	end, 300000) -- 5 minute delay to allow viewing output
 
 	return collection
 end

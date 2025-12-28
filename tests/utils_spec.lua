@@ -59,25 +59,25 @@ package main
 		it("creates focus pattern from position id", function()
 			local position = { id = "/path/to/file.go::Describe text::It test" }
 			local result = utils.create_position_focus(position)
-			assert.equals("'\\bDescribe text It test\\b'", result)
+			assert.equals("\\bDescribe text It test\\b", result)
 		end)
 
 		it("handles nested namespaces", function()
 			local position = { id = "/path/file.go::Outer::Inner::test name" }
 			local result = utils.create_position_focus(position)
-			assert.equals("'\\bOuter Inner test name\\b'", result)
+			assert.equals("\\bOuter Inner test name\\b", result)
 		end)
 
 		it("removes quotes from pattern", function()
 			local position = { id = '/path/file.go::"Describe"::"It"' }
 			local result = utils.create_position_focus(position)
-			assert.equals("'\\bDescribe It\\b'", result)
+			assert.equals("\\bDescribe It\\b", result)
 		end)
 
 		it("returns fallback pattern when no separator found", function()
 			local position = { id = "/path/to/file.go" }
 			local result = utils.create_position_focus(position)
-			assert.equals("'.*'", result)
+			assert.equals(".*", result)
 		end)
 	end)
 end)

@@ -85,14 +85,15 @@ function utils.create_position_focus(position)
 	local sep_pos = string.find(position.id, "::")
 	if not sep_pos then
 		-- fallback to match all tests if no separator found
-		return "'.*'"
+		return ".*"
 	end
 	local name = string.sub(position.id, sep_pos + 2)
 	name, _ = string.gsub(name, "::", " ")
 	name, _ = string.gsub(name, '"', "")
-	-- prepare the pattern
+	-- prepare the pattern with word boundaries
 	-- https://github.com/onsi/ginkgo/issues/1126#issuecomment-1409245937
-	return "'\\b" .. name .. "\\b'"
+	-- Note: no shell quotes needed since neotest passes command as table
+	return "\\b" .. name .. "\\b"
 end
 
 return utils
