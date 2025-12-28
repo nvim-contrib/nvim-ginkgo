@@ -3,6 +3,7 @@ local plenary = require("plenary.path")
 local async = require("neotest.async")
 local logger = require("neotest.logging")
 local utils = require("nvim-ginkgo.utils")
+local report = require("nvim-ginkgo.report")
 local watch = require("nvim-ginkgo.watch")
 
 ---@class nvim-ginkgo.Config
@@ -302,25 +303,13 @@ function adapter.results(spec, result, tree)
 		return {}
 	end
 
-	local dok, report = pcall(vim.json.decode, report_data, { luanil = { object = true } })
+	local dok, report_json = pcall(vim.json.decode, report_data, { luanil = { object = true } })
 	if not dok then
 		logger.error("Failed to parse test output json ", report_path)
 		return {}
 	end
 
-	-- map Ginkgo states to valid neotest states
-	local state_map = {
-		pending = "skipped",
-		panicked = "failed",
-		skipped = "skipped",
-		passed = "passed",
-		failed = "failed",
-		interrupted = "failed",
-		aborted = "failed",
-		timedout = "failed",
-	}
-
-	for _, suite_item in ipairs(report) do
+	for _, suite_item in ipairs(report_json) do
 		-- track suite-level results
 		local suite_item_node = {}
 		local suite_item_node_id = suite_item.SuitePath
@@ -347,21 +336,18 @@ function adapter.results(spec, result, tree)
 		suite_item_node.short = string.format("Passed: %d, Failed: %d, Skipped: %d", passed, failed, skipped)
 		collection[suite_item_node_id] = suite_item_node
 
-		-- leaf node types that represent test cases
-		local test_leaf_types = { It = true, Specify = true, Entry = true }
-
 		for _, spec_item in ipairs(suite_item.SpecReports or {}) do
-			if test_leaf_types[spec_item.LeafNodeType] then
+			if report.test_leaf_types[spec_item.LeafNodeType] then
 				local spec_item_node = {}
-				local spec_item_node_id = utils.create_location_id(spec_item)
+				local spec_item_node_id = report.create_location_id(spec_item)
 
 				-- map state to valid neotest status
-				spec_item_node.status = state_map[spec_item.State] or "failed"
+				spec_item_node.status = report.state_map[spec_item.State] or "failed"
 
 				-- color definition
-				local spec_item_color = utils.get_color(spec_item)
+				local spec_item_color = report.get_color(spec_item)
 				-- set the node short attribute
-				spec_item_node.short = utils.create_desc(spec_item, spec_item_color)
+				spec_item_node.short = report.create_desc(spec_item, spec_item_color)
 
 				-- add test duration if available
 				if spec_item.RunTime then
@@ -382,11 +368,11 @@ function adapter.results(spec, result, tree)
 				if spec_item.Failure then
 					spec_item_node.errors = {}
 
-					local err = utils.create_error(spec_item)
+					local err = report.create_error(spec_item)
 					-- add the error
 					table.insert(spec_item_node.errors, err)
 					-- prepare the output
-					local err_output = utils.create_error_output(spec_item)
+					local err_output = report.create_error_output(spec_item)
 					-- set the node output
 					spec_item_node.output = async.fn.tempname()
 					table.insert(temp_files, spec_item_node.output)
@@ -399,7 +385,7 @@ function adapter.results(spec, result, tree)
 					spec_item_node.short = spec_item_node.short .. ": " .. err.message
 				elseif spec_item.CapturedGinkgoWriterOutput or spec_item.CapturedStdOutErr then
 					-- prepare the output (now also triggers for stdout/stderr)
-					local spec_output = utils.create_success_output(spec_item)
+					local spec_output = report.create_success_output(spec_item)
 					-- set the node output
 					spec_item_node.output = async.fn.tempname()
 					table.insert(temp_files, spec_item_node.output)
