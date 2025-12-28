@@ -227,9 +227,9 @@ function utils.create_position_focus(position)
 	local name = string.sub(position.id, string.find(position.id, "::") + 2)
 	name, _ = string.gsub(name, "::", " ")
 	name, _ = string.gsub(name, '"', "")
-	-- TODO: there is a problem with slashes for sure!
+	-- escape forward slashes for regex pattern matching
 	name, _ = string.gsub(name, "/", "\\/")
-	-- escape some pattern characters
+	-- escape regex special characters
 	name, _ = string.gsub(name, "([%.%+%-%*%?%[%]%(%)%$%^%|])", "\\%1")
 
 	-- prepare the pattern

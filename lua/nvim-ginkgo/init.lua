@@ -141,7 +141,7 @@ function adapter.build_spec(args)
 	}
 
 	if args.strategy == "dap" then
-		dap.setup_debugging(directory)
+		dap.check_dap_available()
 
 		local dap_args = vim.deepcopy(c.dap.args)
 
