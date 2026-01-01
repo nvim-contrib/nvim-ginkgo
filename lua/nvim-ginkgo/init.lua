@@ -4,9 +4,7 @@ local dap = require("nvim-ginkgo.strategies.dap")
 local lib = require("neotest.lib")
 local logger = require("neotest.logging")
 local plenary = require("plenary.path")
-local query = require("nvim-ginkgo.query")
-local output = require("nvim-ginkgo.output")
-local location = require("nvim-ginkgo.location")
+local utils = require("nvim-ginkgo.utils")
 
 ---@class nvim-ginkgo.Adapter: neotest.Adapter
 ---@field setup fun(config: nvim-ginkgo.Config): nil
@@ -125,7 +123,7 @@ function adapter.build_spec(args)
 	}
 
 	if args.strategy == "dap" then
-		dap.setup_debugging(directory)
+		dap.check_dap_available()
 
 		local dap_args = vim.deepcopy(c.dap.args)
 
