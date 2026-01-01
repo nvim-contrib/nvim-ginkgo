@@ -1,17 +1,18 @@
 local style = require("nvim-ginkgo.style")
+local location = require("nvim-ginkgo.location")
 
-local utils = {}
+local M = {}
 
 ---@return string
-function utils.create_success_output(spec)
+function M.create_success_output(spec)
 	local output = {}
 
-	local info_color = utils.get_color(spec)
-	local info_text = utils.create_desc(spec, info_color)
+	local info_color = M.get_color(spec)
+	local info_text = M.create_desc(spec, info_color)
 
 	-- prepare the info
 	local info = {
-		spec_location = utils.create_location(spec.LeafNodeLocation),
+		spec_location = location.create_location(spec.LeafNodeLocation),
 	}
 
 	-- prepare the output
@@ -19,14 +20,14 @@ function utils.create_success_output(spec)
 	table.insert(output, style.gray .. info.spec_location)
 
 	if spec.CapturedGinkgoWriterOutput ~= nil then
-		table.insert(output, style.clear .. utils.format_output(spec.CapturedGinkgoWriterOutput))
+		table.insert(output, style.clear .. M.format_output(spec.CapturedGinkgoWriterOutput))
 	end
 
 	-- done
 	return table.concat(output, "\n") .. "\n"
 end
 
-function utils.create_error(spec)
+function M.create_error(spec)
 	local failure = spec.Failure
 
 	local err = {
@@ -42,18 +43,18 @@ function utils.create_error(spec)
 end
 
 ---@return string
-function utils.create_error_output(spec)
-	local info_color = utils.get_color(spec)
-	local info_text = utils.create_desc(spec, info_color)
+function M.create_error_output(spec)
+	local info_color = M.get_color(spec)
+	local info_text = M.create_desc(spec, info_color)
 
 	local failure = spec.Failure
 	-- prepare the info
 	local info = {
 		failure_status = "[" .. string.upper(spec.State) .. "]",
 		failure_node_type = "[" .. failure.FailureNodeType .. "]",
-		failure_node_location = utils.create_location(failure.FailureNodeLocation),
-		failure_message = utils.format_output(failure.Message),
-		failure_location = utils.create_location(failure.Location),
+		failure_node_location = location.create_location(failure.FailureNodeLocation),
+		failure_message = M.format_output(failure.Message),
+		failure_location = location.create_location(failure.Location),
 		failure_stack_trace = failure.Location.FullStackTrace,
 	}
 
@@ -65,7 +66,7 @@ function utils.create_error_output(spec)
 	table.insert(output, style.bold .. "  " .. "In " .. info.failure_node_type .. " at " .. info.failure_node_location)
 
 	if spec.CapturedGinkgoWriterOutput ~= nil then
-		table.insert(output, style.clear .. utils.format_output(spec.CapturedGinkgoWriterOutput))
+		table.insert(output, style.clear .. M.format_output(spec.CapturedGinkgoWriterOutput))
 	end
 
 	if spec.State == "panicked" then
@@ -89,7 +90,7 @@ local function get_buf_line(buf, nr)
 end
 
 ---@return string
-function utils.get_build_tags()
+function M.get_build_tags()
 	local line = get_buf_line(0)
 	local tag_style
 	for _, item in ipairs({ "// +build ", "//go:build " }) do
@@ -108,7 +109,7 @@ function utils.get_build_tags()
 end
 
 ---@return string
-function utils.get_color(spec)
+function M.get_color(spec)
 	local color = nil
 
 	if spec.Failure ~= nil then
@@ -129,7 +130,7 @@ function utils.get_color(spec)
 end
 
 ---@return string
-function utils.create_desc(spec, color)
+function M.create_desc(spec, color)
 	local spec_desc_texts = {}
 	-- prepare
 	for index, line in ipairs(spec.ContainerHierarchyTexts) do
@@ -151,7 +152,7 @@ function utils.create_desc(spec, color)
 end
 
 ---@return string
-function utils.format_output(message)
+function M.format_output(message)
 	local output = {}
 	-- tab
 	for line in string.gmatch(message, "([^\n]+)") do
@@ -161,80 +162,4 @@ function utils.format_output(message)
 	return table.concat(output, "\n")
 end
 
----@return string
-function utils.create_location_id(spec)
-	local segments = {}
-	-- add the spec filename
-	table.insert(segments, spec.LeafNodeLocation.FileName)
-	-- add the spec hierarchy
-	for _, segment in pairs(spec.ContainerHierarchyTexts) do
-		table.insert(segments, '"' .. segment .. '"')
-	end
-	-- add the spec text
-	table.insert(segments, '"' .. spec.LeafNodeText .. '"')
-
-	local id = table.concat(segments, "::")
-	-- done
-	return id
-end
-
----@return string
-function utils.create_location(spec)
-	return spec.FileName .. ":" .. spec.LineNumber
-end
-
----@param file_path string
----@param source number
----@param captured_nodes table
----@return neotest.Position|nil
-function utils.create_position(file_path, source, captured_nodes)
-	local function get_match_type()
-		if captured_nodes["test.name"] then
-			return "test"
-		end
-		if captured_nodes["namespace.name"] then
-			return "namespace"
-		end
-	end
-
-	local match_type = get_match_type()
-	-- if we have a match
-	if match_type then
-		---@type string
-		local name = vim.treesitter.get_node_text(captured_nodes[match_type .. ".name"], source)
-		local match_name = vim.treesitter.get_node_text(captured_nodes["func_name"], source)
-		local definition = captured_nodes[match_type .. ".definition"]
-
-		name, _ = string.gsub(name, '"', "")
-		-- prepare the name
-		if match_name == "When" then
-			name = string.lower(match_name) .. " " .. name
-		end
-
-		return {
-			type = match_type,
-			path = file_path,
-			name = '"' .. name .. '"',
-			range = { definition:range() },
-		}
-	end
-end
-
----@param position neotest.Position
----@return string
-function utils.create_position_focus(position)
-	-- pos.id in form "path/to/file::describe text::test text"
-	local name = string.sub(position.id, string.find(position.id, "::") + 2)
-	name, _ = string.gsub(name, "::", " ")
-	name, _ = string.gsub(name, '"', "")
-	-- escape forward slashes for regex pattern matching
-	name, _ = string.gsub(name, "/", "\\/")
-	-- escape regex special characters
-	name, _ = string.gsub(name, "([%.%+%-%*%?%[%]%(%)%$%^%|])", "\\%1")
-
-	-- prepare the pattern
-	-- https://github.com/onsi/ginkgo/issues/1126#issuecomment-1409245937
-	return "\\b" .. name .. "\\b"
-end
-
-return utils
+return M
