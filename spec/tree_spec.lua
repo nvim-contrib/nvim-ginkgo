@@ -54,10 +54,49 @@ describe("tree.parse_positions", function()
 		local subtracts_test = tree_helpers.find_position(result, '"subtracts correctly"')
 		assert.is_not_nil(subtracts_test, "Should find 'subtracts correctly' test")
 		assert.are.equal("test", subtracts_test.type)
+	end)
 
-		-- NOTE: Entry nodes are not yet supported. Entry calls are nested in argument_list,
-		-- not at statement level, so neotest.lib doesn't detect them automatically.
-		-- This is a known limitation documented in tree.lua.
+	nio_tests.it("detects Entry nodes in DescribeTable as tests", function()
+		local fixture = fixtures.path("ginkgo/describe_table_test.go")
+		local result = tree.parse_positions(fixture)
+
+		assert.is_not_nil(result)
+
+		-- Find the outer Describe
+		local describe = tree_helpers.find_position(result, '"Math Operations"')
+		assert.is_not_nil(describe)
+		assert.are.equal("namespace", describe.type)
+
+		-- Find DescribeTable namespaces
+		local addition_table = tree_helpers.find_position(result, '"Addition"')
+		assert.is_not_nil(addition_table, "Should find 'Addition' DescribeTable")
+		assert.are.equal("namespace", addition_table.type)
+
+		local multiplication_table = tree_helpers.find_position(result, '"Multiplication"')
+		assert.is_not_nil(multiplication_table, "Should find 'Multiplication' DescribeTable")
+		assert.are.equal("namespace", multiplication_table.type)
+
+		-- Find Entry nodes as tests under Addition
+		local entry1 = tree_helpers.find_position(result, '"1 + 1 = 2"')
+		assert.is_not_nil(entry1, "Should find Entry '1 + 1 = 2' as test")
+		assert.are.equal("test", entry1.type)
+
+		local entry2 = tree_helpers.find_position(result, '"2 + 3 = 5"')
+		assert.is_not_nil(entry2, "Should find Entry '2 + 3 = 5' as test")
+		assert.are.equal("test", entry2.type)
+
+		local entry3 = tree_helpers.find_position(result, '"negative numbers"')
+		assert.is_not_nil(entry3, "Should find Entry 'negative numbers' as test")
+		assert.are.equal("test", entry3.type)
+
+		-- Find Entry nodes as tests under Multiplication
+		local entry4 = tree_helpers.find_position(result, '"2 * 3 = 6"')
+		assert.is_not_nil(entry4, "Should find Entry '2 * 3 = 6' as test")
+		assert.are.equal("test", entry4.type)
+
+		local entry5 = tree_helpers.find_position(result, '"5 * 5 = 25"')
+		assert.is_not_nil(entry5, "Should find Entry '5 * 5 = 25' as test")
+		assert.are.equal("test", entry5.type)
 	end)
 
 	nio_tests.it("handles nested contexts", function()

@@ -39,47 +39,16 @@ end
 -- @param path string Absolute path to Go test file
 -- @return neotest.Tree|nil Tree of positions or nil on error
 --
--- KNOWN LIMITATION: Entry nodes in DescribeTable and DescribeTableSubtree are NOT detected.
---
--- Why Entry nodes are challenging:
--- 1. Entry nodes are call_expression nodes nested INSIDE an argument_list
--- 2. They're not at statement level (not direct children of a block)
--- 3. neotest.lib.treesitter.parse_positions() only builds trees from statement-level nodes
--- 4. Even though our Entry query matches correctly, neotest.lib filters them out
---
--- Example AST structure:
---   DescribeTable/DescribeTableSubtree call_expression
---   └── argument_list
---       ├── "Test Name" (string)
---       ├── func(...) { ... } (function body)
---       ├── Entry("case 1", 1, 2, 3)  ← Entry here (nested in argument_list)
---       └── Entry("case 2", 100, 200, 300)
---
--- Current behavior:
--- - DescribeTable/DescribeTableSubtree: ✅ Detected as namespace
--- - DescribeTableSubtree It blocks: ✅ Detected as tests (workaround available)
--- - DescribeTable: ⚠️ No It blocks, so no runnable tests without Entry support
--- - Entry nodes: ⚠️ Not detected (documented limitation)
---
--- Impact:
--- - DescribeTableSubtree users can still run tests (It blocks are detected)
--- - DescribeTable users should prefer DescribeTableSubtree for now
---
--- TODO: Future enhancement could implement Entry support through:
--- 1. Post-processing after main tree parse
--- 2. Using vim.treesitter directly to extract Entry nodes from argument_list
--- 3. Creating Entry Tree objects and integrating into the tree
--- This requires deep understanding of neotest.Tree API and is complex to implement correctly.
+-- Entry Node Support:
+-- Entry nodes in DescribeTable are now detected as test nodes (like It).
+-- They are included in the test.scm query and automatically detected by neotest.lib.
 function M.parse_positions(path)
-	-- Load and combine queries
+	-- Load and combine queries (namespace + test, including Entry as tests)
 	local namespace_query = load_query("namespace")
 	local test_query = load_query("test")
-	-- Note: entry.scm query file exists but is not loaded here due to Entry detection limitation (see above)
-	-- Note: lifecycle.scm exists but is not loaded (lifecycle hooks are not runnable tests)
-
 	local combined_query = namespace_query .. "\n" .. test_query
 
-	-- Parse using neotest lib
+	-- Parse using neotest lib to get all nodes including Entry as tests
 	local lib = require("neotest.lib")
 	local opts = {
 		nested_namespaces = true,
