@@ -6,6 +6,7 @@ local logger = require("neotest.logging")
 local plenary = require("plenary.path")
 local utils = require("nvim-ginkgo.utils")
 local tree = require("nvim-ginkgo.tree")
+local cmd = require("nvim-ginkgo.cmd")
 
 ---@class nvim-ginkgo.Adapter: neotest.Adapter
 ---@field setup fun(config: nvim-ginkgo.Config): nil
@@ -59,88 +60,7 @@ end
 ---@param args neotest.RunArgs
 ---@return nil | neotest.RunSpec | neotest.RunSpec[]
 function adapter.build_spec(args)
-	local c = config.read()
-
-	local report_path = async.fn.tempname()
-
-	local cargs = {}
-	vim.list_extend(cargs, {
-		"--keep-going",
-		"--json-report",
-		report_path,
-		"--silence-skips",
-	})
-
-	local position = args.tree:data()
-	local directory = position.path
-	---@type string
-	local focus_file_path = directory
-	---@type string?
-	local focus_pattern
-
-	-- The path for the position is not a directory, ensure the directory variable refers to one
-	if vim.fn.isdirectory(position.path) ~= 1 then
-		-- prepare the focus path
-		if position.type == "test" or position.type == "namespace" then
-			local line_number = position.range[1] + 1
-			-- replace the focus_file_path with its line number
-			focus_file_path = position.path .. ":" .. line_number
-			-- create the focus pattern
-			focus_pattern = utils.create_position_focus(position)
-
-			vim.list_extend(cargs, { "--focus", focus_pattern })
-		end
-
-		vim.list_extend(cargs, { "--focus-file", focus_file_path })
-		-- find the directory
-		directory = vim.fn.fnamemodify(position.path, ":h")
-	end
-
-	local extra_args = args.extra_args or {}
-	-- merge the argument
-	for _, value in ipairs(extra_args) do
-		table.insert(cargs, value)
-	end
-
-	local command = {}
-	vim.list_extend(command, c.command)
-	vim.list_extend(command, cargs)
-	vim.list_extend(command, { directory .. plenary.path.sep .. "..." })
-
-	---@type nil | neotest.RunSpec | neotest.RunSpec[]
-	local spec = {
-		command = command,
-		context = {
-			-- input
-			report_input_type = position.type,
-			report_input_path = position.path,
-			-- output
-			report_output_path = report_path,
-		},
-	}
-
-	if args.strategy == "dap" then
-		dap.check_dap_available()
-
-		local dap_args = vim.deepcopy(c.dap.args)
-
-		-- only some of the arguments are valid here so we can not directly use cargs
-		vim.list_extend(dap_args, {
-			"--ginkgo.json-report",
-			report_path,
-			"--ginkgo.silence-skips",
-			"--ginkgo.focus-file",
-			focus_file_path,
-		})
-
-		if focus_pattern then
-			vim.list_extend(dap_args, { "--ginkgo.focus", focus_pattern })
-		end
-
-		spec.strategy = dap.get_dap_config(directory, dap_args)
-	end
-
-	return spec
+	return cmd.build(args)
 end
 
 ---@async
