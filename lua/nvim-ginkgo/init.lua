@@ -3,7 +3,7 @@ local plenary = require("plenary.path")
 local async = require("neotest.async")
 local logger = require("neotest.logging")
 local tree = require("nvim-ginkgo.tree")
-local cmd = require("nvim-ginkgo.cmd")
+local spec = require("nvim-ginkgo.spec")
 local report = require("nvim-ginkgo.report")
 
 ---@class neotest.Adapter
@@ -50,7 +50,7 @@ end
 ---@param args neotest.RunArgs
 ---@return nil | neotest.RunSpec | neotest.RunSpec[]
 function adapter.build_spec(args)
-	return cmd.build(args)
+	return spec.build(args)
 end
 
 ---@async

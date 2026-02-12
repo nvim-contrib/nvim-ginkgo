@@ -1,9 +1,9 @@
--- Tests for cmd.lua module (command building)
+-- Tests for spec.lua module (spec building)
 
 ---@diagnostic disable: undefined-field
 
 local nio_tests = require("nio.tests")
-local cmd = require("nvim-ginkgo.cmd")
+local spec = require("nvim-ginkgo.spec")
 
 -- Helper to create a mock neotest tree
 local function create_mock_tree(position_data)
@@ -32,7 +32,7 @@ local function table_contains(tbl, value)
 	return false
 end
 
-describe("cmd.build", function()
+describe("spec.build", function()
 	describe("directory position", function()
 		nio_tests.it("builds command for directory with no filters", function()
 			-- Use an actual existing directory for the test
@@ -49,7 +49,7 @@ describe("cmd.build", function()
 				tree = create_mock_tree(position),
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_not_nil(result)
 			assert.is_table(result.command)
@@ -87,7 +87,7 @@ describe("cmd.build", function()
 				tree = create_mock_tree(position),
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_not_nil(result)
 			assert.is_table(result.command)
@@ -119,7 +119,7 @@ describe("cmd.build", function()
 				tree = create_mock_tree(position),
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_not_nil(result)
 			assert.is_table(result.command)
@@ -165,7 +165,7 @@ describe("cmd.build", function()
 				tree = create_mock_tree(position),
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_not_nil(result)
 			assert.is_table(result.command)
@@ -203,7 +203,7 @@ describe("cmd.build", function()
 				tree = create_mock_tree(position),
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_not_nil(result)
 			assert.is_table(result.command)
@@ -250,7 +250,7 @@ describe("cmd.build", function()
 				extra_args = { "--label-filter", "slow", "-p" },
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_not_nil(result)
 			assert.is_table(result.command)
@@ -274,7 +274,7 @@ describe("cmd.build", function()
 				extra_args = {},
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_not_nil(result)
 			assert.is_table(result.command)
@@ -292,7 +292,7 @@ describe("cmd.build", function()
 				tree = create_mock_tree(position),
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_not_nil(result)
 			assert.is_table(result.command)
@@ -313,7 +313,7 @@ describe("cmd.build", function()
 				tree = create_mock_tree(position),
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_not_nil(result.context)
 			assert.are.equal("test", result.context.report_input_type)
@@ -334,8 +334,8 @@ describe("cmd.build", function()
 				tree = create_mock_tree(position),
 			}
 
-			local result1 = cmd.build(args)
-			local result2 = cmd.build(args)
+			local result1 = spec.build(args)
+			local result2 = spec.build(args)
 
 			-- Report paths should be valid strings
 			assert.is_not_nil(result1.context.report_output_path)
@@ -359,7 +359,7 @@ describe("cmd.build", function()
 				tree = create_mock_tree(position),
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_table(result.command)
 
@@ -393,7 +393,7 @@ describe("cmd.build", function()
 				tree = create_mock_tree(position),
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_table(result.command)
 
@@ -427,7 +427,7 @@ describe("cmd.build", function()
 				tree = create_mock_tree(position),
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_table(result.command)
 
@@ -459,7 +459,7 @@ describe("cmd.build", function()
 				tree = create_mock_tree(position),
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_not_nil(result)
 			assert.is_table(result.command)
@@ -496,7 +496,7 @@ describe("cmd.build", function()
 				tree = create_mock_tree(position),
 			}
 
-			local result = cmd.build(args)
+			local result = spec.build(args)
 
 			assert.is_table(result.command)
 
