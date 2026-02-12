@@ -24,6 +24,42 @@ local function create_location_id(spec)
 	return id
 end
 
+---Build a namespace ID from file path and hierarchy segments
+---@param file_path string The file path
+---@param hierarchy_segments table Array of hierarchy segment strings
+---@return string Namespace identifier in format "file.go::\"Describe\"::\"Context\""
+local function build_namespace_id(file_path, hierarchy_segments)
+	local segments = { file_path }
+	for _, segment in ipairs(hierarchy_segments) do
+		table.insert(segments, '"' .. segment .. '"')
+	end
+	return table.concat(segments, "::")
+end
+
+---Aggregate status from child test results
+---@param children table Array of child info with status field
+---@return string Status: "failed", "passed", or "skipped"
+local function aggregate_status(children)
+	local has_failed = false
+	local has_passed = false
+
+	for _, child in ipairs(children) do
+		if child.status == "failed" then
+			has_failed = true
+		elseif child.status == "passed" then
+			has_passed = true
+		end
+	end
+
+	if has_failed then
+		return "failed"
+	end
+	if has_passed then
+		return "passed"
+	end
+	return "skipped"
+end
+
 ---Create an error object from a failed spec
 ---@param spec table The spec item from Ginkgo report
 ---@return table Error object with line number and message
@@ -64,6 +100,9 @@ function M.parse(spec, result, tree)
 		return {}
 	end
 
+	-- Track namespace data: namespace_id -> {children = {{status, short, errors}...}}
+	local namespaces = {}
+
 	for _, suite_item in pairs(report) do
 		if suite_item.SpecReports == nil then
 			local suite_item_node = {}
@@ -76,6 +115,7 @@ function M.parse(spec, result, tree)
 			collection[suite_item_node_id] = suite_item_node
 		end
 
+		-- Phase 1: Process leaf tests and track namespace data
 		for _, spec_item in pairs(suite_item.SpecReports or {}) do
 			if spec_item.LeafNodeType == "It" then
 				local spec_item_node = {}
@@ -124,8 +164,49 @@ function M.parse(spec, result, tree)
 				local spec_item_node_id = create_location_id(spec_item)
 				-- set the node
 				collection[spec_item_node_id] = spec_item_node
+
+				-- Track this test in all ancestor namespaces
+				local file_path = spec_item.LeafNodeLocation.FileName
+				local child_info = {
+					status = spec_item_node.status,
+					short = spec_item_node.short,
+					errors = spec_item_node.errors,
+				}
+
+				-- Build namespace hierarchy from ContainerHierarchyTexts
+				for level = 1, #spec_item.ContainerHierarchyTexts do
+					local hierarchy_segments = {}
+					for i = 1, level do
+						table.insert(hierarchy_segments, spec_item.ContainerHierarchyTexts[i])
+					end
+
+					local namespace_id = build_namespace_id(file_path, hierarchy_segments)
+
+					-- Initialize namespace if not exists
+					if namespaces[namespace_id] == nil then
+						namespaces[namespace_id] = { children = {} }
+					end
+
+					-- Add child info to this namespace
+					table.insert(namespaces[namespace_id].children, child_info)
+				end
 			end
 		end
+	end
+
+	-- Phase 2: Generate namespace results with aggregated status and output
+	for namespace_id, data in pairs(namespaces) do
+		local status = aggregate_status(data.children)
+
+		-- Create summary output from child info
+		local output_content = output.create_namespace_summary(data.children)
+		local output_path = async.fn.tempname()
+		lib.files.write(output_path, output_content)
+
+		collection[namespace_id] = {
+			status = status,
+			output = output_path,
+		}
 	end
 
 	return collection

@@ -139,4 +139,63 @@ function M.get_error(item)
 	return table.concat(output, "\n")
 end
 
+---Create summary output for a namespace node from its child test results
+---@param children table Array of child info with {status, short, errors}
+---@return string Formatted summary with counts and failed test list
+function M.create_namespace_summary(children)
+	-- Count results by status
+	local counts = { passed = 0, failed = 0, pending = 0, skipped = 0 }
+	local failed_tests = {}
+
+	for _, child in ipairs(children) do
+		counts[child.status] = (counts[child.status] or 0) + 1
+		if child.status == "failed" then
+			table.insert(failed_tests, child.short)
+		end
+	end
+
+	local lines = {}
+
+	-- Status line in Ginkgo format: "SUCCESS! -- X Passed | X Failed | X Pending | X Skipped"
+	local status_color = counts.failed > 0 and style.red or style.green
+	local status_text = counts.failed > 0 and "FAILED!" or "SUCCESS!"
+
+	local status_line = status_color
+			.. status_text
+			.. style.clear
+			.. " -- "
+			.. style.green
+			.. counts.passed
+			.. " Passed"
+			.. style.clear
+			.. " | "
+			.. style.red
+			.. counts.failed
+			.. " Failed"
+			.. style.clear
+			.. " | "
+			.. style.yellow
+			.. counts.pending
+			.. " Pending"
+			.. style.clear
+			.. " | "
+			.. style.cyan
+			.. counts.skipped
+			.. " Skipped"
+			.. style.clear
+
+	table.insert(lines, status_line)
+
+	-- List failed tests if any
+	if #failed_tests > 0 then
+		table.insert(lines, "")
+		table.insert(lines, style.red .. style.bold .. "Failed tests:" .. style.clear)
+		for _, test_short in ipairs(failed_tests) do
+			table.insert(lines, "  " .. test_short)
+		end
+	end
+
+	return table.concat(lines, "\n")
+end
+
 return M
