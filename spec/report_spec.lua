@@ -6,23 +6,11 @@ local nio_tests = require("nio.tests")
 local report = require("nvim-ginkgo.report")
 local async = require("neotest.async")
 local lib = require("neotest.lib")
+local helpers = dofile(vim.fn.getcwd() .. "/spec/helpers/report.lua")
 
--- Helper to create a temporary JSON report file
-local function create_temp_report(report_data)
-	local report_path = async.fn.tempname()
-	local json_content = vim.json.encode(report_data)
-	vim.fn.writefile({ json_content }, report_path)
-	return report_path
-end
-
--- Helper to create a mock spec with report path
-local function create_mock_spec(report_path)
-	return {
-		context = {
-			report_output_path = report_path,
-		},
-	}
-end
+-- Use helpers from spec/helpers/report.lua
+local create_temp_report = helpers.create_temp_report
+local create_mock_spec = helpers.create_mock_spec
 
 describe("report.parse", function()
 	describe("successful test parsing", function()

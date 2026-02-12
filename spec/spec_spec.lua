@@ -4,33 +4,12 @@
 
 local nio_tests = require("nio.tests")
 local spec = require("nvim-ginkgo.spec")
+local helpers = dofile(vim.fn.getcwd() .. "/spec/helpers/spec.lua")
 
--- Helper to create a mock neotest tree
-local function create_mock_tree(position_data)
-	return {
-		data = function()
-			return position_data
-		end,
-		children = function()
-			return {}
-		end,
-	}
-end
-
--- Helper for plain string matching (avoids Lua pattern special characters)
-local function contains(str, substr)
-	return str:find(substr, 1, true) ~= nil
-end
-
--- Helper to check if a table contains a value
-local function table_contains(tbl, value)
-	for _, v in ipairs(tbl) do
-		if v == value then
-			return true
-		end
-	end
-	return false
-end
+-- Use helpers from spec/helpers/spec.lua
+local create_mock_tree = helpers.create_mock_tree
+local contains = helpers.contains
+local table_contains = helpers.table_contains
 
 describe("spec.build", function()
 	describe("directory position", function()
