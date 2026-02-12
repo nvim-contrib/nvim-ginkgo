@@ -4,39 +4,10 @@
 
 local nio_tests = require("nio.tests")
 local output = require("nvim-ginkgo.output")
+local helpers = dofile(vim.fn.getcwd() .. "/spec/helpers/output.lua")
 
--- Helper to create a mock spec item
-local function create_mock_spec(state, has_failure)
-	local spec = {
-		LeafNodeType = "It",
-		LeafNodeText = "should do something",
-		State = state,
-		LeafNodeLocation = {
-			FileName = "/test/example_test.go",
-			LineNumber = 42,
-		},
-		ContainerHierarchyTexts = { "Describe Feature", "Context Scenario" },
-		CapturedGinkgoWriterOutput = "Test output\nLine 2",
-	}
-
-	if has_failure then
-		spec.Failure = {
-			Message = "Expected false\n  to be true",
-			FailureNodeType = "It",
-			FailureNodeLocation = {
-				FileName = "/test/example_test.go",
-				LineNumber = 43,
-			},
-			Location = {
-				FileName = "/test/example_test.go",
-				LineNumber = 44,
-				FullStackTrace = "goroutine 1:\nstack trace here",
-			},
-		}
-	end
-
-	return spec
-end
+-- Use helpers from spec/helpers/output.lua
+local create_mock_spec = helpers.create_mock_spec
 
 describe("output.create_spec_description", function()
 	nio_tests.it("formats test description with hierarchy", function()
