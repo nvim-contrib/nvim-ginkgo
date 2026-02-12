@@ -4,6 +4,7 @@ local async = require("neotest.async")
 local logger = require("neotest.logging")
 local utils = require("nvim-ginkgo.utils")
 local tree = require("nvim-ginkgo.tree")
+local cmd = require("nvim-ginkgo.cmd")
 
 ---@class neotest.Adapter
 ---@field name string
@@ -49,62 +50,7 @@ end
 ---@param args neotest.RunArgs
 ---@return nil | neotest.RunSpec | neotest.RunSpec[]
 function adapter.build_spec(args)
-	local report_path = async.fn.tempname()
-	local report_filename = vim.fn.fnamemodify(report_path, ":t")
-	local report_directory = vim.fn.fnamemodify(report_path, ":h")
-	local cargs = {}
-
-	table.insert(cargs, "ginkgo")
-	table.insert(cargs, "run")
-	table.insert(cargs, "-v")
-	table.insert(cargs, "--keep-going")
-	table.insert(cargs, "--output-dir")
-	table.insert(cargs, report_directory)
-	table.insert(cargs, "--json-report")
-	table.insert(cargs, report_filename)
-
-	-- prepare the focus
-	local position = args.tree:data()
-	if position.type == "test" or position.type == "namespace" then
-		-- pos.id in form "path/to/file::Describe text::test text"
-		local name = string.sub(position.id, string.find(position.id, "::") + 2)
-		name, _ = string.gsub(name, "::", " ")
-		name, _ = string.gsub(name, '"', "")
-		-- prepare the pattern
-		-- https://github.com/onsi/ginkgo/issues/1126#issuecomment-1409245937
-		local pattern = "'\\b" .. name .. "\\b'"
-		-- prepare tha arguments
-		table.insert(cargs, "--focus")
-		table.insert(cargs, pattern)
-	end
-
-	local directory = position.path
-	-- The path for the position is not a directory, ensure the directory variable refers to one
-	if vim.fn.isdirectory(position.path) ~= 1 then
-		table.insert(cargs, "--focus-file")
-		table.insert(cargs, position.path)
-		-- find the directory
-		directory = vim.fn.fnamemodify(position.path, ":h")
-	end
-
-	local extra_args = args.extra_args or {}
-	-- merge the argument
-	for _, value in ipairs(extra_args) do
-		table.insert(cargs, value)
-	end
-
-	table.insert(cargs, directory .. plenary.path.sep .. "...")
-
-	return {
-		command = table.concat(cargs, " "),
-		context = {
-			-- input
-			report_input_type = position.type,
-			report_input_path = position.path,
-			-- output
-			report_output_path = report_path,
-		},
-	}
+	return cmd.build(args)
 end
 
 ---@async
