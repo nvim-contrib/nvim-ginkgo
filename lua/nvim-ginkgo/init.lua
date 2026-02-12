@@ -3,6 +3,7 @@ local plenary = require("plenary.path")
 local async = require("neotest.async")
 local logger = require("neotest.logging")
 local utils = require("nvim-ginkgo.utils")
+local tree = require("nvim-ginkgo.tree")
 
 ---@class neotest.Adapter
 ---@field name string
@@ -42,23 +43,7 @@ end
 ---@param file_path string Absolute file path
 ---@return neotest.Tree | nil
 function adapter.discover_positions(file_path)
-	local query = [[
-    ; -- Namespaces --
-    ; Matches: `describe('subject')` and `context('case')`
-    ((call_expression
-      function: (identifier) @func_name (#any-of? @func_name "Describe" "FDescribe" "PDescribe" "XDescribe" "DescribeTable" "FDescribeTable" "PDescribeTable" "XDescribeTable" "Context" "FContext" "PContext" "XContext" "When" "FWhen" "PWhen" "XWhen")
-      arguments: (argument_list ((interpreted_string_literal) @namespace.name))
-    )) @namespace.definition
-
-    ; -- Tests --
-    ; Matches: `it('test')`
-    ((call_expression
-      function: (identifier) @func_name (#any-of? @func_name "It" "FIt" "PIt" "XIt" "Specify" "FSpecify" "PSpecify" "XSpecify" "Entry" "FEntry" "PEntry" "XEntry")
-      arguments: (argument_list ((interpreted_string_literal) @test.name))
-    )) @test.definition
-  ]]
-
-	return lib.treesitter.parse_positions(file_path, query, { nested_namespaces = true, require_namespaces = true })
+	return tree.parse_positions(file_path)
 end
 
 ---@param args neotest.RunArgs
