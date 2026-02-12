@@ -5,6 +5,7 @@ local logger = require("neotest.logging")
 local tree = require("nvim-ginkgo.tree")
 local spec = require("nvim-ginkgo.spec")
 local report = require("nvim-ginkgo.report")
+local dap = require("nvim-ginkgo.dap")
 
 ---@class neotest.Adapter
 ---@field name string
@@ -50,7 +51,14 @@ end
 ---@param args neotest.RunArgs
 ---@return nil | neotest.RunSpec | neotest.RunSpec[]
 function adapter.build_spec(args)
-	return spec.build(args)
+	local run_spec = spec.build(args)
+
+	-- If DAP strategy is requested, enhance the spec with DAP configuration
+	if args.strategy == "dap" then
+		run_spec.strategy = dap.build(run_spec.context)
+	end
+
+	return run_spec
 end
 
 ---@async
