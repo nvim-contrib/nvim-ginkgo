@@ -111,7 +111,7 @@ function M.parse(spec, result, tree)
 				else
 					-- set default output if no output captured
 					if spec_item.CapturedGinkgoWriterOutput == nil then
-						spec_item.CapturedGinkgoWriterOutput = "No output captured"
+						spec_item.CapturedGinkgoWriterOutput = ""
 					end
 					-- prepare the output
 					local spec_output = output.create_spec_output(spec_item)
