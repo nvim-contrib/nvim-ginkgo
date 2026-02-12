@@ -133,7 +133,11 @@ function adapter.results(spec, result, tree)
 					lib.files.write(spec_item_node.output, err_output)
 					-- set the node short attribute
 					spec_item_node.short = spec_item_node.short .. ": " .. err.message
-				elseif spec_item.CapturedGinkgoWriterOutput ~= nil then
+				else
+					-- set default output if no output captured
+					if spec_item.CapturedGinkgoWriterOutput == nil then
+						spec_item.CapturedGinkgoWriterOutput = "No output captured"
+					end
 					-- prepare the output
 					local spec_output = utils.create_success_output(spec_item)
 					-- set the node output
