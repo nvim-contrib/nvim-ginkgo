@@ -8,6 +8,4 @@
     "Describe" "FDescribe" "PDescribe" "XDescribe"
     "Context" "FContext" "PContext" "XContext"
     "When" "FWhen" "PWhen" "XWhen"
-    "DescribeTable" "FDescribeTable" "PDescribeTable" "XDescribeTable"
-    "DescribeTableSubtree" "FDescribeTableSubtree" "PDescribeTableSubtree" "XDescribeTableSubtree"
   )) @namespace.definition
