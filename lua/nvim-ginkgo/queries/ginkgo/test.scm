@@ -7,5 +7,4 @@
   (#any-of? @func_name
     "It" "FIt" "PIt" "XIt"
     "Specify" "FSpecify" "PSpecify" "XSpecify"
-    "Entry" "FEntry" "PEntry" "XEntry"
   )) @test.definition

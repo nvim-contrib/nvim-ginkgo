@@ -51,6 +51,7 @@ function M.parse_positions(path)
 	-- Parse using neotest lib to get all nodes including Entry as tests
 	local lib = require("neotest.lib")
 	local opts = {
+		nested_tests = true,
 		nested_namespaces = true,
 		require_namespaces = true,
 	}
