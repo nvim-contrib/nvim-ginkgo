@@ -4,6 +4,12 @@
 
 local M = {}
 
+---@class nvim-ginkgo.ConfigDap
+---@field args string[]
+M.config = {
+	"--ginkgo.v",
+}
+
 ---Validate that DAP is available, error if not
 local function check_dap_available()
 	local ok, _ = pcall(require, "dap-go")
@@ -11,6 +17,22 @@ local function check_dap_available()
 		local msg = "nvim-dap-go is required for DAP strategy. Install: https://github.com/leoluz/nvim-dap-go"
 		error(msg)
 	end
+end
+
+---Setup DAP configuration
+---Configures Ginkgo arguments for DAP debugging (requires --ginkgo. prefix).
+---Pass nil or omit to use defaults: {"--ginkgo.v"}
+---@param config string[]|nil Array of DAP arguments
+function M.setup(config)
+	if not config then
+		return -- Keep defaults
+	end
+
+	if type(config) ~= "table" then
+		error("nvim-ginkgo.dap.setup: config must be a table (array of strings)")
+	end
+
+	M.config = config
 end
 
 ---Build DAP strategy from spec context
@@ -30,11 +52,13 @@ function M.build(context)
 
 	-- Build DAP-specific arguments with --ginkgo. prefix
 	-- When debugging with Delve, Ginkgo flags need the --ginkgo. prefix
-	local dap_args = {
+	local dap_args = vim.deepcopy(M.config)
+
+	vim.list_extend(dap_args, {
 		"--ginkgo.json-report",
 		report_path,
 		"--ginkgo.silence-skips",
-	}
+	})
 
 	-- Add focus parameters if present
 	if focus_file_path then

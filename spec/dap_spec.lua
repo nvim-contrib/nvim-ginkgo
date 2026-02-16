@@ -209,3 +209,52 @@ describe("dap.build", function()
 		assert.is_true(vim.tbl_contains(strategy.args, "slow"))
 	end)
 end)
+
+describe("dap.setup", function()
+	-- Save original config
+	local original_config
+
+	nio_tests.before_each(function()
+		original_config = vim.deepcopy(dap.config)
+	end)
+
+	nio_tests.after_each(function()
+		-- Restore original config
+		dap.config = original_config
+	end)
+
+	nio_tests.it("keeps defaults when config is nil", function()
+		local default_config = vim.deepcopy(dap.config)
+		dap.setup(nil)
+		assert.are.same(default_config, dap.config)
+	end)
+
+	nio_tests.it("replaces defaults with custom args", function()
+		local custom = { "--ginkgo.vv", "--ginkgo.trace" }
+		dap.setup(custom)
+		assert.are.same(custom, dap.config)
+	end)
+
+	nio_tests.it("errors when config is not a table", function()
+		assert.has_error(function()
+			dap.setup("invalid")
+		end, "nvim-ginkgo.dap.setup: config must be a table (array of strings)")
+	end)
+
+	nio_tests.it("uses custom config in build() calls", function()
+		dap.setup({ "--ginkgo.custom" })
+
+		local position = {
+			type = "test",
+			path = "/project/pkg/example_test.go",
+			name = "test",
+			id = '/project/pkg/example_test.go::"test"',
+			range = { 10, 0, 20, 0 },
+		}
+
+		local run_spec = spec.build({ tree = create_mock_tree(position) })
+		local dap_config = dap.build(run_spec.context)
+
+		assert.is_true(vim.tbl_contains(dap_config.args, "--ginkgo.custom"))
+	end)
+end)

@@ -1,7 +1,5 @@
 local lib = require("neotest.lib")
 local plenary = require("plenary.path")
-local async = require("neotest.async")
-local logger = require("neotest.logging")
 local tree = require("nvim-ginkgo.tree")
 local spec = require("nvim-ginkgo.spec")
 local report = require("nvim-ginkgo.report")
@@ -16,6 +14,18 @@ local adapter = { name = "nvim-ginkgo" }
 ---@async
 ---@return string | nil @Absolute root dir of test suite
 adapter.root = lib.files.match_root_pattern("go.mod", "go.sum")
+
+---Setup the adapter with custom configuration
+---@param config table|nil Configuration with optional fields:
+---  - command (string[]): Ginkgo command arguments
+---  - dap (string[]): DAP debugging arguments with --ginkgo. prefix
+function adapter.setup(config)
+	config = config or {}
+	-- Setup the spec
+	spec.setup(config.command)
+	-- Setup the dap
+	dap.setup(config.dap)
+end
 
 ---Filter directories when searching for test files
 ---@async
