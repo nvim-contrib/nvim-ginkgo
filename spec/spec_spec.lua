@@ -494,3 +494,54 @@ describe("spec.build", function()
 		end)
 	end)
 end)
+
+describe("spec.setup", function()
+	-- Save original config
+	local original_config
+
+	nio_tests.before_each(function()
+		original_config = vim.deepcopy(spec.config)
+	end)
+
+	nio_tests.after_each(function()
+		-- Restore original config
+		spec.config = original_config
+	end)
+
+	nio_tests.it("keeps defaults when config is nil", function()
+		local default_config = vim.deepcopy(spec.config)
+		spec.setup(nil)
+		assert.are.same(default_config, spec.config)
+	end)
+
+	nio_tests.it("replaces defaults with custom command", function()
+		local custom = { "ginkgo", "run", "-vv" }
+		spec.setup(custom)
+		assert.are.same(custom, spec.config)
+	end)
+
+	nio_tests.it("errors when config is not a table", function()
+		assert.has_error(function()
+			spec.setup("invalid")
+		end, "nvim-ginkgo.spec.setup: config must be a table (array of strings)")
+	end)
+
+	nio_tests.it("uses custom config in build() calls", function()
+		spec.setup({ "custom", "cmd" })
+
+		local position = {
+			type = "dir",
+			path = "/project/pkg",
+			name = "pkg",
+			range = { 0, 0, 0, 0 },
+		}
+
+		local args = {
+			tree = create_mock_tree(position),
+		}
+
+		local run_spec = spec.build(args)
+		assert.are.equal("custom", run_spec.command[1])
+		assert.are.equal("cmd", run_spec.command[2])
+	end)
+end)

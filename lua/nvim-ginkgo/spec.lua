@@ -37,6 +37,28 @@ local function create_focus_pattern(position)
 	return pattern
 end
 
+M.config = {
+	"ginkgo",
+	"run",
+	"-v",
+}
+
+---Setup spec configuration
+---Configures the base Ginkgo command used for test execution.
+---Pass nil or omit to use defaults: {"ginkgo", "run", "-v"}
+---@param config string[]|nil Array of command arguments
+function M.setup(config)
+	if not config then
+		return -- Keep defaults
+	end
+
+	if type(config) ~= "table" then
+		error("nvim-ginkgo.spec.setup: config must be a table (array of strings)")
+	end
+
+	M.config = config
+end
+
 ---Build a test execution specification
 ---@param args neotest.RunArgs
 ---@return neotest.RunSpec|nil
@@ -47,15 +69,14 @@ function M.build(args)
 	local report_path = async.fn.tempname()
 
 	-- Build ginkgo command arguments
-	local cargs = {}
+	local cargs = vim.deepcopy(M.config)
 
-	table.insert(cargs, "ginkgo")
-	table.insert(cargs, "run")
-	table.insert(cargs, "-v")
-	table.insert(cargs, "--keep-going")
-	table.insert(cargs, "--silence-skips")
-	table.insert(cargs, "--json-report")
-	table.insert(cargs, report_path)
+	vim.list_extend(cargs, {
+		"--keep-going",
+		"--silence-skips",
+		"--json-report",
+		report_path,
+	})
 
 	-- Determine test targeting based on position type
 	local focus_file_path = nil
