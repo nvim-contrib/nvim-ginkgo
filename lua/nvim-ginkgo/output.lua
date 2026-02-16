@@ -68,9 +68,14 @@ function M.create_spec_output(spec)
 
 	local output = {}
 	-- prepare the output
-	table.insert(output, main .. style.clear .. info_text)
+	table.insert(output, style.clear .. info_text)
 	table.insert(output, style.gray .. info.spec_location)
 	table.insert(output, style.clear .. M.get_output(spec))
+
+	if spec.CapturedStdOutErr ~= nil then
+		table.insert(output, style.clear .. "Captured StdOut/StdErr Output")
+		table.insert(output, style.clear .. M.get_stdouterr(spec))
+	end
 
 	-- done
 	return table.concat(output, "\n")
@@ -108,6 +113,11 @@ function M.create_error_output(spec)
 		table.insert(output, style.clear .. M.get_output(spec))
 	end
 
+	if spec.CapturedStdOutErr ~= nil then
+		table.insert(output, style.clear .. "Captured StdOut/StdErr Output")
+		table.insert(output, style.clear .. M.get_stdouterr(spec))
+	end
+
 	if spec.State == "panicked" then
 		table.insert(output, style.clear .. main .. failure.ForwardedPanic)
 		table.insert(output, style.clear .. main .. "Full Stack Trace")
@@ -124,6 +134,7 @@ function M.get_output(item)
 	for line in string.gmatch(item.CapturedGinkgoWriterOutput, "([^\n]+)") do
 		table.insert(output, "  " .. line)
 	end
+
 	-- done
 	return table.concat(output, "\n")
 end
@@ -135,6 +146,17 @@ function M.get_error(item)
 	for line in string.gmatch(item.Message, "([^\n]+)") do
 		table.insert(output, "  " .. line)
 	end
+	-- done
+	return table.concat(output, "\n")
+end
+
+---@return string
+function M.get_stdouterr(item)
+	local output = {}
+	for line in string.gmatch(item.CapturedStdOutErr, "([^\n]+)") do
+		table.insert(output, "  " .. line)
+	end
+
 	-- done
 	return table.concat(output, "\n")
 end
