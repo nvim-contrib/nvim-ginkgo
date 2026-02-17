@@ -33,6 +33,8 @@ function adapter.setup(config)
 	spec.setup(config.command)
 	-- Setup the dap
 	dap.setup(config.dap)
+	-- done
+	return adapter
 end
 
 ---Filter directories when searching for test files
